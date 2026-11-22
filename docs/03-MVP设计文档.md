@@ -23,18 +23,19 @@
 | 目标 | 说明 |
 | --- | --- |
 | G1 端到端闭环 | 资料 → 卡片 → 计划 → 复习 → 答疑，五段全通 |
-| G2 确定性优先 | 排程等关键逻辑用确定性算法，LLM 只做「生成」与「策略」 |
+| G2 排程可解释且可约束 | 排程由 Agent 决策，但受确定性护栏约束，同输入可复现 |
 | G3 类型可插拔 | 新增卡片类型不改核心 CRUD |
-| G4 离线可用 | 复习链路完全离线，写操作可重放 |
+| G4 离线可用 | 复习链路完全离线；客户端只消费已排期队列 |
 | G5 成本可控 | 单用户月成本 ≤ ¥3，嵌入自托管 |
 
 ### 1.2 关键设计原则
 
 1. **Agent 产出草稿，用户做最终决策。** 任何 LLM 产物落库前必须经过显式确认。
-2. **LLM 不做确定性计算。** 记忆排程、去重、权限、计费全部是代码逻辑。
-3. **深模块、窄接口。** 每个模块对外只暴露一个稳定的接口，内部实现可替换（如嵌入模型、LLM 供应商）。
-4. **所有写操作幂等。** 客户端生成 `idempotency_key`，服务端去重，支撑离线重放。
-5. **数据模型按「类型」抽象，不按「记忆卡片」硬编码。** 卡片内容存 `jsonb`，类型定义驱动校验。
+2. **Agent 做决策，代码做约束。** 排程、去重、权限、计费的关键不变量由**确定性代码**保证；Agent 只在合法空间内做选择，越界即降级。
+3. **客户端不承担业务计算。** 排程、去重、优先级全在服务端；客户端只做「渲染 + 队列消费 + 事件上报」。
+4. **深模块、窄接口。** 每个模块对外只暴露一个稳定的接口，内部实现可替换（如嵌入模型、LLM 供应商、排程策略）。
+5. **所有写操作幂等。** 客户端生成 `idempotency_key`，服务端去重，支撑离线重放。
+6. **数据模型按「类型」抽象，不按「记忆卡片」硬编码。** 卡片内容存 `jsonb`，类型定义驱动校验。
 
 ---
 
@@ -44,16 +45,17 @@
 
 | 层 | 选型 | 版本 | 理由 |
 | --- | --- | --- | --- |
-| 移动端 | Flutter | 3.24+ / Dart 3.5+ | 单代码库覆盖 iOS + Android；后续可低成本补 Web/Desktop |
-| 状态管理 | Riverpod + freezed | 2.5 / 2.5 | 编译期安全、易测试、无 BuildContext 依赖 |
-| 路由 | go_router | 14+ | 声明式、支持深链（推送跳转） |
-| 本地库 | Drift (SQLite) | 2.20+ | 类型安全 SQL、迁移成熟、支持复杂查询 |
+| 移动端 | Flutter | 3.47 / Dart 3.13 | 单代码库覆盖 iOS + Android；**MVP 仅移动端**，不排期 Web/Desktop |
+| 状态管理 | Riverpod + freezed | 3.5 / 3.x | 编译期安全、易测试、无 BuildContext 依赖 |
+| 路由 | go_router | 18+ | 声明式、支持深链（推送跳转） |
+| 本地库 | Drift (SQLite) | 2.35+ | 类型安全 SQL、迁移成熟；**只存缓存与 Outbox，不存排程** |
 | 网络 | dio + retrofit | 5.x / 4.x | 拦截器、重试、类型安全 |
 | 后端 | Python + FastAPI | 3.12 / 0.115+ | 异步原生、OpenAPI 自动生成、AI 生态最全 |
 | ORM | SQLAlchemy 2.0 (async) + Alembic | 2.0 | 成熟、异步、迁移工具完善 |
 | 数据库 | PostgreSQL + pgvector | 16 / 0.7+ | 关系 + 向量一体，少一个组件 |
 | 全文检索 | pg_trgm + tsvector | 内置 | 中文模糊搜索够用，避免引入 ES |
 | Agent 编排 | LangGraph | 0.2+ | 有状态图、`interrupt` 原生支持人工确认、Postgres checkpointer |
+| 排程 | **排程 Agent + FSRS 护栏** | — | Agent 决策，FSRS 兜底；客户端不参与 |
 | LLM 接入 | OpenAI 兼容协议（`openai` SDK） | 1.x | 一套代码切 DeepSeek / Qwen / GPT |
 | 异步任务 | Redis + ARQ | 7 / 0.26+ | asyncio 原生，比 Celery 轻 |
 | 嵌入 | bge-m3 自托管（TEI） | — | 中文效果好、1024 维、无按 token 费用 |
@@ -62,6 +64,8 @@
 | 可观测 | OpenTelemetry + Langfuse + Sentry | — | 链路 + LLM 追踪 + 错误 |
 | 部署 | Docker Compose → 云托管 | — | MVP 阶段单机足够 |
 
+> **客户端不引入排程库**：Dart 侧没有 FSRS 依赖，排程全部在服务端（见 ADR-004）。
+
 ### 2.2 关键 ADR
 
 #### ADR-001：为什么选 Flutter 而不是 React Native
@@ -69,10 +73,12 @@
 | 维度 | Flutter | React Native |
 | --- | --- | --- |
 | 卡片翻转/手势动画 | 自绘引擎，60fps 稳定 | 依赖原生桥，复杂动画需额外优化 |
-| 多端延展 | 一套代码可出 Web/Desktop | 需额外适配 |
+| 长列表性能（千张卡片） | `ListView.builder` 稳定 | 需额外优化 |
 | 团队语言 | Dart（学习成本） | TypeScript（若团队是 TS 背景更优） |
 
-**决策**：选 Flutter。核心理由是**复习场景高度依赖流畅的卡片交互与动画**，且后续要补桌面端。若团队为纯 TS 背景，RN 亦可接受，但需提前评估动画性能。
+**决策**：选 Flutter。核心理由是**复习场景高度依赖流畅的卡片交互与动画**（翻页、遮罩揭示、手势评分），且 Flutter 的渲染一致性让「设计稿还原」成本更低。
+
+> **不构成理由的部分**：多端延展能力。MVP **明确仅移动端**（见需求文档 §2.4），不以「未来可出 Web/Desktop」作为选型依据——那会让选型偏离当前真实需求。
 
 #### ADR-002：为什么用 LangGraph 而不是自研编排
 
@@ -82,13 +88,55 @@
 
 **决策**：用 LangGraph，但**通过一层 `AgentRuntime` 接口隔离**，避免框架锁定。若未来替换，只改适配层。
 
-#### ADR-003：为什么排程不用 LLM
+#### ADR-003：排程为什么交给 Agent，而不是固定算法
 
-LLM 输出不确定，且无法保证单调性（间隔应随记忆强度递增）。FSRS 是经过大规模验证的确定性算法。
+**背景**：产品要服务两类差异极大的用户——
 
-**决策**：排程 = FSRS 纯函数；Agent 只做**策略层**（时间预算、跨集优先级、目标拆解、自然语言解释）。
+- **考试冲刺型**：考期临近（≤ 30 天），需要短期高强度、按考纲优先级压缩间隔、允许「超量复习」。
+- **强记忆型**：自评记忆力好，需要拉长间隔、减少无效重复，否则会因「太简单」而放弃。
 
-#### ADR-004：为什么用 pgvector 而不是独立向量库
+固定参数的 FSRS 无法同时满足。FSRS 的权重是**全局最优**，不是**个体最优**；虽然支持按用户训练个性化权重，但那需要大量复习历史，冷启动阶段无解。
+
+**备选方案**
+
+| 方案 | 优点 | 缺点 |
+| --- | --- | --- |
+| A. 纯 FSRS + 可调参数 | 确定、可测试 | 参数空间表达不了「按考纲优先级」「考前突击」这类策略 |
+| B. 纯 LLM 排程 | 灵活、可解释 | 不确定、无法保证单调性、成本高、难复现 |
+| C. **Agent 决策 + 确定性护栏** | 灵活 + 可控 | 实现复杂度上升，需要护栏层 |
+
+**决策**：采用 **C**。
+
+- **Agent 负责决策**：结合用户画像（学习模式、每日预算、考试日期）与卡片质量（错误次数、难度、历史评分）输出 `SchedulePlan`。
+- **确定性工具供 Agent 调用**：`compute_retrievability` / `estimate_interval` / `get_due_cards` / `get_card_quality` / `check_budget`。Agent **不能自己算数学**，只能调工具。
+- **护栏层校验**（代码，非 LLM）：间隔单调性、上下界 `[1, 365]` 天、每日预算 ≤ 设定 × 1.15、幂等。违反则**降级为 FSRS 结果**并记录 `scheduler.fallback` 告警。
+- **可复现**：温度 0 + 固定工具返回 + 护栏，保证同输入同输出。
+
+**为什么不直接让 LLM 输出 `due_at`**：LLM 无法保证「评分越高间隔越长」这类单调性约束，也无法保证不超预算。护栏层把这些变成硬约束，Agent 只在合法空间内做选择。
+
+**代价**：排程延迟从「纯函数微秒级」变成「LLM 秒级」。因此排程**异步批量执行**（每次复习记录同步后触发），不阻塞复习交互。
+
+#### ADR-004：为什么客户端不参与排程
+
+**背景**：离线复习需要「下次什么时候复习」的答案。
+
+**备选方案**
+
+| 方案 | 说明 |
+| --- | --- |
+| A. 客户端移植 FSRS（Dart） | 离线可算，但双实现一致性风险高，且与 ADR-003 冲突（Agent 排程无法离线） |
+| B. **客户端只消费服务端已排期队列** | 离线时按预下载队列复习，评分入 Outbox，联网后服务端重排程 |
+
+**决策**：采用 **B**。
+
+- 客户端**不实现任何排程算法**，只做「队列消费 + 评分记录」。
+- 预下载未来 7 天队列（含卡片内容与图片）。
+- 离线评分写入 Outbox，联网重放后由服务端 Agent 重新排程。
+- 好处：消除双实现一致性风险（原 T2）、离线逻辑极简、排程策略可随时调整而无需发版。
+
+**代价**：离线队列可能过期（用户 10 天没联网）。缓解：过期时提示「需联网更新排期」，允许继续消费旧队列但标注「可能不是最优」。
+
+#### ADR-005：为什么用 pgvector 而不是独立向量库
 
 - MVP 数据量 < 1000 万向量，pgvector HNSW 足够。
 - 少一个组件 = 少一套运维、备份、一致性保障。
@@ -96,11 +144,13 @@ LLM 输出不确定，且无法保证单调性（间隔应随记忆强度递增�
 
 **决策**：pgvector。若未来 QPS 撑不住，再迁 Qdrant（通过 `VectorStore` 接口隔离）。
 
-#### ADR-005：为什么「云端为主 + 本地缓存」而不是本地优先
+#### ADR-006：为什么「云端为主 + 本地缓存」而不是本地优先
 
 本地优先（CRDT）能带来最好的离线体验，但 MVP 阶段冲突合并的复杂度会拖慢交付。
 
 **决策**：服务端为唯一事实源；客户端做**读缓存 + 写 Outbox 队列**。离线可读、可写（复习记录），联网重放。冲突时以服务端为准并提示用户。
+
+> 与 ADR-004 的关系：正因为客户端不参与排程，本地缓存**不需要**合并排程状态，冲突面大幅收窄——只需合并「复习记录」这一种不可变事件。
 
 ---
 
@@ -194,6 +244,7 @@ flowchart LR
 
 ```mermaid
 erDiagram
+    users ||--o| learner_profiles : has
     users ||--o{ devices : has
     users ||--o{ folders : owns
     users ||--o{ decks : owns
@@ -201,6 +252,7 @@ erDiagram
     users ||--o{ conversations : owns
     users ||--o{ study_plans : owns
     users ||--o{ sources : uploads
+    users ||--o{ schedule_runs : triggers
 
     folders ||--o{ decks : contains
     decks ||--o{ cards : contains
@@ -226,6 +278,9 @@ erDiagram
 
     generation_jobs ||--o{ drafts : produces
     decks ||--o{ drafts : staging
+
+    schedule_runs ||--o{ schedule_items : produces
+    cards ||--o{ schedule_items : scheduled
 ```
 
 ### 4.2 核心表定义
@@ -405,6 +460,40 @@ plan_days(id, plan_id, day date, planned_review int, planned_new int,
 plan_items(id, plan_day_id, deck_id, card_count int, kind varchar)
 ```
 
+#### schedule_runs / schedule_items
+
+> 排程 Agent 的执行记录。**只追加**，用于可观测、可回溯、可复现。
+
+```sql
+schedule_runs(
+    id            uuid PK,
+    user_id       uuid FK,
+    mode          varchar(16),      -- standard / sprint / strong_memory / custom
+    trigger       varchar(32),      -- review_sync / manual / daily_cron
+    card_count    int,
+    fallback_count int,             -- 护栏降级卡片数
+    duration_ms   int,
+    token_usage   jsonb,
+    created_at    timestamptz
+)
+
+schedule_items(
+    id            uuid PK,
+    run_id        uuid FK,
+    card_id       uuid FK,
+    due_at        timestamptz,
+    interval_days real,
+    rationale     text,             -- 面向用户的一句话理由
+    fallback      boolean,          -- 是否由 FSRS 兜底
+    guard_rule    varchar(64) NULL, -- 触发的护栏规则
+    created_at    timestamptz
+)
+```
+
+索引：`(user_id, created_at DESC)`、`(card_id, created_at DESC)`。
+
+> **为什么落库**：排程结果需要可回溯（用户问「为什么这张卡今天复习」），也需要可复现（测试比对快照）。`review_states` 只存最终状态，`schedule_items` 存**决策依据**。
+
 #### devices
 
 ```sql
@@ -447,19 +536,38 @@ devices(id, user_id, platform varchar, model varchar, os_version varchar,
 
 ### 4.4 cards.fields Schema（memory 类型）
 
+> 字段命名对齐设计稿：**明文**（`plaintext`）= 正面，**暗文**（`ciphertext`）= 背面。
+
 ```jsonc
 {
-  "front": "线粒体的主要功能是什么？",
-  "back": "通过有氧呼吸产生 ATP，为细胞提供能量。",
-  "images": [],                    // [{key, width, height}]
+  "plaintext": "线粒体的主要功能是什么？",
+  "ciphertext": "通过有氧呼吸产生 ATP，为细胞提供能量。",
+  "images": [],                    // [{key, width, height, alt}]
   "hint": "与能量代谢有关",
   "extra": "细胞器章节 · 第 3 节"
 }
 ```
 
-约束：`front` ≤ 200 字，`back` ≤ 500 字，均不可为空。
+约束：`plaintext` ≤ 200 字，`ciphertext` ≤ 500 字，均不可为空。
 
-### 4.5 扩展点：新增卡片类型
+### 4.5 learner_profiles（学习画像）
+
+> 排程 Agent 的输入。与 `users` 一对一。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| user_id | uuid PK | |
+| mode | varchar(16) | `standard` / `sprint` / `strong_memory` / `custom` |
+| daily_minutes | int | 每日可用时长，默认 30 |
+| exam_date | date NULL | 考试日期（`sprint` 模式必填） |
+| desired_retention | real | 0.70–0.99，默认 0.90 |
+| new_per_day | int | 每日新卡上限，默认 20 |
+| max_reviews_per_day | int | 每日复习上限，默认 200 |
+| updated_at | timestamptz | |
+
+> **模式切换只影响未来排程**，不追溯历史（见需求文档 Q6）。切换时记录 `profile.mode_changed` 事件用于分析。
+
+### 4.6 扩展点：新增卡片类型
 
 新增 `schedule` 类型只需：
 
@@ -493,6 +601,7 @@ backend/
 │   │   ├── decks.py
 │   │   ├── cards.py
 │   │   ├── reviews.py
+│   │   ├── schedule.py          # 排程历史 / 画像
 │   │   ├── sources.py
 │   │   ├── generation.py
 │   │   ├── plans.py
@@ -503,12 +612,15 @@ backend/
 │   │   ├── deck_service.py
 │   │   ├── card_service.py
 │   │   ├── review_service.py
+│   │   ├── schedule_service.py  # 排程编排（触发 Agent + 落库）
 │   │   ├── generation_service.py
 │   │   ├── plan_service.py
 │   │   ├── chat_service.py
 │   │   └── search_service.py
 │   ├── domain/
-│   │   ├── fsrs.py              # 纯函数排程
+│   │   ├── scheduling_tools.py  # 确定性工具（Agent 只能调用）
+│   │   ├── scheduling_guard.py  # 护栏（纯函数）
+│   │   ├── fsrs.py              # 兜底排程（纯函数）
 │   │   ├── dedup.py             # 去重
 │   │   ├── card_types/
 │   │   │   ├── base.py          # CardTypeSpec 协议
@@ -519,6 +631,7 @@ backend/
 │   │   ├── runtime.py           # AgentRuntime 接口 + LangGraph 实现
 │   │   ├── graphs/
 │   │   │   ├── cardsmith.py     # 制卡
+│   │   │   ├── scheduler.py     # 排程（核心）
 │   │   │   ├── planner.py       # 计划
 │   │   │   ├── tutor.py         # 答疑
 │   │   │   └── conductor.py     # 统筹（P1）
@@ -542,75 +655,197 @@ backend/
 └── pyproject.toml
 ```
 
-### 5.2 FSRS 引擎（`domain/fsrs.py`）
+### 5.2 排程 Agent（`agents/graphs/scheduler.py` + `domain/fsrs.py`）
 
-**纯函数、无 IO、可完全单测。** 实现参考 FSRS-5 公式。
+> **架构定位**：排程是「Agent 决策 + 代码约束」的双层结构。Agent 负责**选择**，护栏负责**合法性**，FSRS 负责**兜底**。
+
+#### 5.2.1 分层职责
+
+```mermaid
+flowchart TB
+    Trigger["复习记录同步完成"] --> Collect["收集上下文<br/>（确定性）"]
+    Collect --> Profile["加载用户画像<br/>（学习模式/预算/考期）"]
+    Profile --> Agent["排程 Agent<br/>（LLM，温度 0）"]
+    Agent -->|调用| Tools["确定性工具集"]
+    Tools --> Agent
+    Agent --> Plan["SchedulePlan<br/>每张卡片 due_at + 理由"]
+    Plan --> Guard{"护栏校验<br/>（代码）"}
+    Guard -->|通过| Persist["写入 review_states"]
+    Guard -->|违反| Fallback["降级 FSRS 计算"]
+    Fallback --> Persist
+    Persist --> Notify["更新客户端队列"]
+```
+
+| 层 | 职责 | 实现 | 可测试性 |
+| --- | --- | --- | --- |
+| **上下文收集** | 聚合到期卡片、卡片质量、用户画像 | 纯 SQL 查询 | 集成测试 |
+| **Agent 决策** | 输出每张卡片的 `due_at` + 理由 | LangGraph + LLM | 桩 LLM 单测 |
+| **确定性工具** | 提供数学计算能力 | 纯函数 | 单元测试 |
+| **护栏** | 校验合法性、越界降级 | 纯函数 | 单元测试（核心） |
+| **FSRS 兜底** | 护栏失败时的确定性结果 | 纯函数 | 单元测试 |
+
+#### 5.2.2 确定性工具（`domain/scheduling_tools.py`）
+
+Agent **不能自己算数学**，只能调用这些工具。工具是纯函数，无 IO。
 
 ```python
 DECAY = -0.5
 FACTOR = 19 / 81
 
-def retrievability(elapsed_days: float, stability: float) -> float:
+
+def compute_retrievability(elapsed_days: float, stability: float) -> float:
     """R(t, S) = (1 + FACTOR * t / S) ^ DECAY"""
-    return (1 + FACTOR * elapsed_days / stability) ** DECAY
+    if stability <= 0:
+        return 0.0
+    if elapsed_days <= 0:
+        return 1.0
+    return float((1 + FACTOR * elapsed_days / stability) ** DECAY)
 
-def next_interval(stability: float, desired_retention: float) -> float:
-    """I = (S / FACTOR) * (r ^ (1/DECAY) - 1)"""
-    return (stability / FACTOR) * (desired_retention ** (1 / DECAY) - 1)
 
-def initial_stability(rating: int, w: list[float]) -> float:
-    return w[rating - 1]
+def estimate_interval(stability: float, retention: float) -> float:
+    """由目标保留率反解间隔天数：I = (S / FACTOR) * (r ^ (1/DECAY) - 1)"""
+    if stability <= 0:
+        return 0.0
+    raw = (stability / FACTOR) * (retention ** (1 / DECAY) - 1)
+    return float(min(max(raw, 1.0), 36500.0))
 
-def initial_difficulty(rating: int, w: list[float]) -> float:
-    d = w[4] - math.exp(w[5] * (rating - 1)) + 1
-    return min(max(d, 1.0), 10.0)
 
-def next_difficulty(d: float, rating: int, w: list[float]) -> float:
-    d2 = d - w[6] * (rating - 3)
-    d3 = w[7] * initial_difficulty(4, w) + (1 - w[7]) * d2
-    return min(max(d3, 1.0), 10.0)
+def initial_stability(rating: int, w: tuple[float, ...]) -> float:
+    return float(w[rating - 1])
 
-def next_stability_on_recall(s, d, r, rating, w) -> float:
+
+def next_stability_on_recall(s: float, d: float, r: float, rating: int, w) -> float:
     hard_penalty = w[15] if rating == 2 else 1.0
     easy_bonus = w[16] if rating == 4 else 1.0
-    return s * (
-        1
-        + math.exp(w[8])
-        * (11 - d)
-        * s ** (-w[9])
-        * (math.exp(w[10] * (1 - r)) - 1)
-        * hard_penalty
-        * easy_bonus
+    return float(
+        s
+        * (
+            1
+            + math.exp(w[8])
+            * (11 - d)
+            * s ** (-w[9])
+            * (math.exp(w[10] * (1 - r)) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
     )
 
-def next_stability_on_forget(s, d, r, w) -> float:
-    return w[11] * d ** (-w[12]) * ((s + 1) ** w[13] - 1) * math.exp(w[14] * (1 - r))
+
+def next_stability_on_forget(s: float, d: float, r: float, w) -> float:
+    return float(w[11] * d ** (-w[12]) * ((s + 1) ** w[13] - 1) * math.exp(w[14] * (1 - r)))
 ```
 
-**核心接口**
+**工具契约**（供 Agent function calling 使用）：
+
+| 工具 | 输入 | 输出 |
+| --- | --- | --- |
+| `get_due_cards` | `deck_ids`, `horizon_days` | `list[CardSnapshot]` |
+| `get_card_quality` | `card_ids` | `list[CardQuality]`（错误次数/难度/历史评分） |
+| `compute_retrievability` | `stability`, `elapsed_days` | `float` |
+| `estimate_interval` | `stability`, `retention` | `float` |
+| `check_budget` | `plan`, `daily_minutes` | `BudgetReport` |
+
+#### 5.2.3 学习模式（Learner Profile）
 
 ```python
 @dataclass(frozen=True)
-class ReviewState:
-    stability: float
-    difficulty: float
-    due_at: datetime
-    last_review_at: datetime | None
-    reps: int
-    lapses: int
-    state: CardState
-    step: int
-
-def schedule(
-    state: ReviewState,
-    rating: Literal[1, 2, 3, 4],
-    now: datetime,
-    config: RunnerConfig,
-) -> tuple[ReviewState, ReviewLog]:
-    """确定性排程。同输入必同输出，无副作用。"""
+class LearnerProfile:
+    mode: Literal["standard", "sprint", "strong_memory", "custom"]
+    daily_minutes: int
+    exam_date: date | None
+    desired_retention: float          # 0.70 – 0.99
+    new_per_day: int
+    max_reviews_per_day: int
 ```
 
-**测试要求**：属性测试（间隔单调性、边界钳制、幂等性）+ 官方 FSRS 测试向量对齐。
+| 模式 | `desired_retention` | `new_per_day` | 排程策略 |
+| --- | --- | --- | --- |
+| `standard` | 0.90 | 20 | 均衡 |
+| `sprint` | 0.95 | 50 | 压缩间隔、按考纲优先级、允许超量 |
+| `strong_memory` | 0.85 | 15 | 拉长间隔、降低频次 |
+| `custom` | 用户指定 | 用户指定 | 完全手动 |
+
+> **模式只影响未来排程**，不追溯历史记录（见需求文档 Q6）。
+
+#### 5.2.4 输出契约
+
+```python
+@dataclass(frozen=True)
+class ScheduleItem:
+    card_id: UUID
+    due_at: datetime
+    interval_days: float
+    rationale: str          # 一句话理由，面向用户展示
+
+@dataclass(frozen=True)
+class SchedulePlan:
+    items: list[ScheduleItem]
+    mode: str
+    generated_at: datetime
+    fallback_used: bool
+```
+
+#### 5.2.5 确定性护栏（`domain/scheduling_guard.py`）
+
+**这是整个排程架构的质量底线。** 纯函数，输入 `SchedulePlan` + 当前状态，输出 `GuardResult`。
+
+```python
+@dataclass(frozen=True)
+class GuardViolation:
+    card_id: UUID
+    rule: str
+    detail: str
+
+@dataclass(frozen=True)
+class GuardResult:
+    ok: bool
+    violations: list[GuardViolation]
+
+def validate(
+    plan: SchedulePlan,
+    previous: dict[UUID, ReviewState],
+    ratings: dict[UUID, int],
+    profile: LearnerProfile,
+) -> GuardResult:
+    """校验排程计划。任一规则不满足即 ok=False。"""
+```
+
+| 规则 | 说明 | 违反后果 |
+| --- | --- | --- |
+| `MONOTONIC_INTERVAL` | 同一卡片，评分越高间隔越长 | 该卡片降级 FSRS |
+| `INTERVAL_BOUNDS` | `1 ≤ interval ≤ 365` 天 | 钳制到边界 |
+| `DAILY_BUDGET` | 预计耗时 ≤ `daily_minutes × 1.15` | 按优先级截断 |
+| `NO_DUPLICATE` | 同一卡片不出现多次 | 去重 |
+| `NO_PAST_DUE` | `due_at > now` | 钳制到 `now + 1 天` |
+
+**降级策略**：违反 `MONOTONIC_INTERVAL` 或 `INTERVAL_BOUNDS` 时，**该卡片**使用 FSRS 结果；其余卡片保留 Agent 结果。记录 `scheduler.fallback` 结构化日志。
+
+#### 5.2.6 可复现性
+
+排程必须可复现，否则无法调试、无法测试：
+
+- LLM `temperature = 0`，`seed` 固定。
+- 工具返回确定（SQL 加 `ORDER BY`）。
+- 护栏是纯函数。
+- 测试用固定 LLM 桩（fixture），断言 `SchedulePlan` 逐字段相等。
+
+#### 5.2.7 测试要求
+
+| 类型 | 范围 | 目标 |
+| --- | --- | --- |
+| 单元 | 工具函数（数学正确性） | 100% 分支 |
+| 单元 | 护栏（每条规则 + 组合） | 100% 分支 |
+| 单元 | 模式差异（sprint 间隔 < standard < strong_memory） | 属性测试 |
+| 集成 | Agent 图执行 + 桩 LLM | 关键路径 |
+| 回归 | 固定输入 → 快照比对 | 全量 |
+
+**必须覆盖的用例**：
+
+- Given 同一卡片连续「简单」，Then 间隔严格递增（护栏保证）
+- Given Agent 输出间隔 400 天，Then 钳制到 365 天
+- Given Agent 输出 `due_at` 在过去，Then 钳制到 `now + 1 天`
+- Given 计划总耗时超预算，Then 按优先级截断
+- Given 护栏失败，Then 该卡片使用 FSRS 结果且记录告警
 
 ### 5.3 制卡流水线（`services/generation_service.py`）
 
@@ -656,7 +891,7 @@ stateDiagram-v2
 ```
 1. 每张卡片只考查一个知识点。
 2. 卡片必须自包含：禁止使用「上文」「该概念」「如图」等指代。
-3. 正面是问题或提示，背面是答案；正面不得包含答案。
+3. 明文是问题或提示，暗文是答案；明文不得包含答案。
 4. 禁止生成是非题、填空题式碎片。
 5. 输出严格 JSON，符合给定 Schema。
 ```
@@ -710,14 +945,22 @@ class AgentRuntime(Protocol):
 
 `LangGraphRuntime` 是唯一实现。换框架只改这一个类。
 
-#### 四个 Agent
+#### 五个 Agent
 
 | Agent | 职责 | 输入 | 输出 | 人工介入 |
 | --- | --- | --- | --- | --- |
 | **CardSmith** | 制卡 | 资料文本 + 配置 | 卡片草稿列表 | ✅ 草稿确认 |
-| **Planner** | 学习计划 | 到期统计 + 时间预算 + 目标 | 7 天计划 | ✅ 计划确认 |
+| **Scheduler** | **排程** | 复习记录 + 用户画像 + 卡片质量 | `SchedulePlan`（每卡 `due_at` + 理由） | ❌ 异步执行 |
+| **Planner** | 长期学习计划 | 到期统计 + 时间预算 + 目标 | 7 天计划 | ✅ 计划确认 |
 | **Tutor** | 答疑 | 问题 + 检索结果 | 带引用的回答 | ❌ 流式输出 |
 | **Conductor** | 统筹调度（P1） | 全局状态 | 通知/建议 | ✅ 建议确认 |
+
+> **Scheduler 与 Planner 的区别**：
+>
+> - **Scheduler** 决定「**这张卡片下次什么时候复习**」——细粒度、每卡一条、异步批量。
+> - **Planner** 决定「**今天/本周学什么**」——粗粒度、按天聚合、需要用户确认。
+>
+> Planner 的输入依赖 Scheduler 的输出（`due_at` 分布），二者顺序执行。
 
 #### CardSmith 图
 
@@ -735,11 +978,36 @@ flowchart LR
 
 **`interrupt` 用法**：`Review` 节点调用 `interrupt({"drafts": [...]})`，图状态持久化到 Postgres；前端确认后调用 `resume(thread_id, {"approved_ids": [...]})`。
 
+#### Scheduler 图
+
+```mermaid
+flowchart LR
+    Start([开始]) --> Load["加载待排程卡片<br/>（确定性）"]
+    Load --> Profile["加载用户画像<br/>（确定性）"]
+    Profile --> Decide["Agent 决策<br/>（LLM，温度 0）"]
+    Decide -->|function calling| Tools["确定性工具"]
+    Tools --> Decide
+    Decide --> Plan["组装 SchedulePlan"]
+    Plan --> Guard{"护栏校验"}
+    Guard -->|通过| Write["写入 review_states"]
+    Guard -->|违反| Fallback["该卡片降级 FSRS"]
+    Fallback --> Write
+    Write --> Emit["发布 schedule.updated 事件"]
+    Emit --> End([结束])
+```
+
+**关键实现要点**：
+
+- **无人工介入**：排程是后台任务，不阻塞用户。
+- **批量**：一次处理一个用户的全部待排程卡片（上限 500），避免多次 LLM 调用。
+- **部分失败**：单张卡片失败不影响其余，失败卡片用 FSRS 兜底。
+- **可观测**：每次执行记录 `scheduler.run`（卡片数、耗时、token、fallback 数）。
+
 #### Planner 图
 
 ```mermaid
 flowchart LR
-    Start([开始]) --> Load["加载到期统计"]
+    Start([开始]) --> Load["加载到期统计<br/>（来自 Scheduler 输出）"]
     Load --> Budget["计算时间预算<br/>（确定性）"]
     Budget --> Decide{"是否超预算？"}
     Decide -->|是| Prioritize["优先级排序<br/>（确定性 + LLM 解释）"]
@@ -751,7 +1019,7 @@ flowchart LR
     Save --> End([结束])
 ```
 
-> **注意**：`Budget` 与 `Prioritize` 是**确定性代码**（基于 FSRS 的 `due_at`、`stability`、卡片集权重），LLM 只负责 `Explain` 生成自然语言理由。
+> **注意**：`Budget` 与 `Prioritize` 是**确定性代码**（基于 Scheduler 产出的 `due_at`、`stability`、卡片集权重），LLM 只负责 `Explain` 生成自然语言理由。
 
 #### Tutor 图
 
@@ -849,11 +1117,22 @@ flowchart LR
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/decks/{id}/review-queue` | 获取复习队列 |
+| GET | `/decks/{id}/review-queue` | 获取**已排期**复习队列（客户端只读） |
+| GET | `/review-queue` | 全局复习队列（跨卡片集） |
 | POST | `/reviews` | 提交复习记录（幂等） |
-| POST | `/reviews/batch` | 批量提交（离线重放） |
+| POST | `/reviews/batch` | 批量提交（离线重放），触发重排程 |
 | GET | `/stats/decks/{id}` | 卡片集统计 |
 | GET | `/stats/overview` | 全局统计 |
+
+#### 排程
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/profile` | 获取学习画像 |
+| PUT | `/profile` | 更新学习画像（模式/预算/考期） |
+| POST | `/schedule/run` | 手动触发重排程（调试/管理用） |
+| GET | `/schedule/runs` | 排程执行历史 |
+| GET | `/schedule/items?card_id=` | 某卡片的排程决策记录（含理由） |
 
 #### 资料与制卡
 
@@ -887,6 +1166,7 @@ flowchart LR
 | POST | `/conversations` | 新建会话 |
 | GET | `/conversations/{id}/messages` | 消息列表 |
 | POST | `/conversations/{id}/messages` | **发送消息（SSE 流式）** |
+| POST | `/cards/{id}/ask` | **卡片内联答疑**（上下文=当前卡片） |
 | DELETE | `/conversations/{id}` | 删除会话 |
 
 #### 设备
@@ -1018,15 +1298,20 @@ app/
 
 ### 7.4 离线与同步
 
+> **核心约束（ADR-004）：客户端不参与排程。** 本地库只存「缓存 + 待上报事件」，**不存排程算法、不计算 `due_at`**。
+
 #### 本地表
 
-| 表 | 用途 |
-| --- | --- |
-| `local_decks` | 卡片集缓存 |
-| `local_cards` | 卡片缓存（含复习状态） |
-| `local_review_logs` | 待同步的复习记录 |
-| `outbox` | 通用写操作队列 |
-| `sync_cursor` | 增量同步游标 |
+| 表 | 用途 | 是否参与排程 |
+| --- | --- | --- |
+| `local_decks` | 卡片集缓存（只读） | ❌ |
+| `local_cards` | 卡片内容缓存（只读） | ❌ |
+| `local_review_queue` | **服务端已排期的今日队列**（预下载 7 天） | 只读消费 |
+| `local_review_logs` | 待同步的复习记录（不可变事件） | ❌ 只上报 |
+| `outbox` | 通用写操作队列 | ❌ |
+| `sync_cursor` | 增量同步游标 | ❌ |
+
+> **关键**：`local_review_queue` 是**服务端排程结果的副本**，客户端只按顺序消费，**不做任何重排**。`local_review_logs` 是**不可变事件流**，只追加、不修改——这使冲突面收窄到「同一事件的重复提交」，用幂等键即可解决。
 
 #### 同步策略
 
@@ -1040,24 +1325,123 @@ sequenceDiagram
     Note over App,Outbox: 启动 / 网络恢复
     App->>Local: 读取 sync_cursor
     App->>API: GET /sync?since=<cursor>
-    API-->>App: 变更集 + new_cursor
-    App->>Local: 事务内应用变更
+    API-->>App: 变更集 + 排程队列 + new_cursor
+    App->>Local: 事务内应用变更（覆盖队列）
     App->>Local: 更新 sync_cursor
 
-    Note over App,Outbox: 离线写入
-    App->>Outbox: 入队（含 idempotency_key）
-    App->>Local: 乐观更新
+    Note over App,Outbox: 离线复习
+    App->>Local: 从 local_review_queue 取下一条
+    App->>Outbox: 评分入队（含 idempotency_key）
+    App->>Local: 标记该条已消费（不计算 due_at）
+
     Note over App,Outbox: 联网后
-    Outbox->>API: 按序重放
-    API-->>Outbox: 成功 / 冲突
-    Outbox->>Local: 确认或回滚
+    Outbox->>API: POST /reviews/batch 按序重放
+    API->>API: 服务端 Agent 重新排程
+    API-->>Outbox: 200 + 新队列
+    Outbox->>Local: 覆盖 local_review_queue
 ```
 
-- **拉取**：`GET /sync?since=<cursor>` 返回 `updated_at > cursor` 的卡片集与卡片（增量）。
+- **拉取**：`GET /sync?since=<cursor>` 返回 `updated_at > cursor` 的卡片集、卡片与**排程队列**。
 - **推送**：Outbox 按 `created_at` 顺序重放，指数退避（1s → 2s → 4s → 8s → 16s），最多 5 次。
-- **冲突**：服务端返回 409 + 最新版本，客户端覆盖本地并提示「有更新」。
+- **冲突**：因为客户端不写排程状态，冲突只可能发生在「同一 `review_id` 重复提交」——服务端幂等去重即可，**不需要**版本号或 CRDT。
+- **队列过期**：预下载 7 天，超期未联网时提示「需联网更新排期」，允许继续消费旧队列但标注「可能不是最优」。
 
-### 7.5 卡片渲染器注册（扩展点）
+#### 自由浏览的离线语义
+
+用户在离线状态下**自由浏览**（FR-4.4）时：
+
+- 只读 `local_cards`，**不写** `local_review_logs`。
+- 不产生任何排程副作用。
+- 「浏览过」记录仅本地保存，不同步（避免无意义流量）。
+
+### 7.5 卡片页面 UI 结构
+
+> 依据 [卡片页面设计稿](卡片页面.png)。
+
+#### 布局
+
+```
+┌──────────────────────────────────┐
+│  ← 返回                    小星星 │  AppBar
+├──────────────────────────────────┤
+│  卡片明文                         │
+│  ┌────────────────────────────┐  │
+│  │ 线粒体的主要功能是什么？      │  │  FrontSection
+│  └────────────────────────────┘  │
+│                                  │
+│  卡片暗文                         │
+│  ┌────────────────────────────┐  │
+│  │ ░░░░░ 点击翻页揭示 ░░░░░░░  │  │  BackSection（遮罩）
+│  └────────────────────────────┘  │
+│                                  │
+│  图片                             │
+│  ┌────────────────────────────┐  │
+│  │        [ image ]           │  │  ImageSection
+│  └────────────────────────────┘  │
+├──────────────────────────────────┤
+│  Agent 分析/解惑区          [展开] │  InlineChatSection
+│  ┌────────────────────────────┐  │
+│  │ （折叠时无内容）             │  │
+│  └────────────────────────────┘  │
+├──────────────────────────────────┤
+│  选项/回答输入/提问输入区          │  InputSection
+│  [A] [B] [C] [D]                 │
+│  ┌──────────────────────┐ [发送] │
+│  │ 输入你的回答/提问…    │        │
+│  └──────────────────────┘        │
+├──────────────────────────────────┤
+│  ‹ 翻页                   1 / 20 ›│  PagerBar
+└──────────────────────────────────┘
+```
+
+#### 组件树
+
+```dart
+CardPage
+├── CardAppBar(back, StarRating)
+├── SingleChildScrollView
+│   ├── FrontSection(text)
+│   ├── BackSection(text, revealed)
+│   ├── ImageSection(images)
+│   ├── InlineChatSection(cardId, collapsed)
+│   └── InputSection(mode)
+└── PagerBar(prev, next, index, total)
+```
+
+#### 两种模式
+
+| 模式 | 暗文 | 输入区 | 评分 | 排程影响 |
+| --- | --- | --- | --- | --- |
+| **复习模式** | 默认遮罩，翻页揭示 | 显示 | 显示 | 记录 `review_log` |
+| **浏览模式** | 直接展示 | 隐藏（只留提问） | 隐藏 | **无** |
+
+#### 状态管理
+
+```dart
+@freezed
+class CardPageState with _$CardPageState {
+  const factory CardPageState({
+    required Card card,
+    required CardPageMode mode,       // review | browse
+    @Default(false) bool revealed,    // 暗文是否揭示
+    @Default(false) bool chatExpanded,
+    @Default(0) int index,
+    required int total,
+  }) = _CardPageState;
+}
+```
+
+#### 交互契约
+
+| 交互 | 复习模式 | 浏览模式 |
+| --- | --- | --- |
+| 点击「翻页」 | 揭示暗文 | 切下一张 |
+| 左右滑动 | 切下一张（已评分） | 切下一张 |
+| 点击小星星 | 记录评分 + 切下一张 | 无响应（隐藏） |
+| 点击图片 | 全屏查看 | 全屏查看 |
+| 展开答疑区 | 请求 LLM（上下文=当前卡片） | 同左 |
+
+### 7.6 卡片渲染器注册（扩展点）
 
 ```dart
 abstract class CardRenderer {
@@ -1134,30 +1518,70 @@ sequenceDiagram
     participant Local as Drift
     participant Outbox
     participant API as FastAPI
-    participant FSRS
+    participant Sched as 排程 Agent
     participant DB as Postgres
 
+    Note over App,DB: ① 预下载（联网时）
+    App->>API: GET /sync?since=<cursor>
+    API-->>App: 排程队列（未来 7 天）
+    App->>Local: 写入 local_review_queue
+
+    Note over App,DB: ② 复习（可离线）
     U->>App: 开始复习
-    App->>Local: 查询 due_at <= now
-    Local-->>App: 队列（离线可用）
+    App->>Local: 读取 local_review_queue
+    Local-->>App: 队列（服务端已排期）
     loop 每张卡片
-        U->>App: 翻面
-        U->>App: 评分
-        App->>FSRS: schedule(state, rating)
-        FSRS-->>App: 新状态
-        App->>Local: 写入 review_log + 更新 state
+        U->>App: 翻页揭示暗文
+        U->>App: 小星星评分
+        App->>Local: 追加 review_log（不可变事件）
         App->>Outbox: 入队（idempotency_key）
+        Note right of App: 客户端不计算 due_at
     end
-    Note over App,Outbox: 联网后
+
+    Note over App,DB: ③ 同步（联网后）
     Outbox->>API: POST /reviews/batch
-    API->>DB: 按 id 去重后写入
-    API-->>Outbox: 200
-    Outbox->>Local: 标记已同步
+    API->>DB: 按 review_id 幂等去重
+    API->>Sched: 触发重排程（异步）
+    Sched->>Sched: Agent 决策 + 护栏校验
+    Sched->>DB: 写入 review_states
+    API-->>Outbox: 200 + 新队列
+    Outbox->>Local: 覆盖 local_review_queue
 ```
 
-> **关键决策**：客户端也实现一份 FSRS（Dart 移植），保证离线时排程正确；服务端重放时以客户端提交的 `rating` 重新计算并校验，**以服务端结果为准**（防止客户端被篡改）。
+> **关键决策（ADR-004）**：客户端**不实现排程算法**。离线复习是消费**服务端已排期**的队列，评分只作为不可变事件上报。
+>
+> 这带来三个好处：
+>
+> 1. **无双实现一致性风险**——不存在「Dart FSRS 与 Python FSRS 结果不一致」的问题。
+> 2. **排程策略可随时调整**——改 Agent 提示词或护栏规则即可，不需要发版。
+> 3. **冲突面极窄**——客户端不写排程状态，只需对 `review_id` 幂等去重。
 
-### 8.3 答疑流程
+### 8.3 自由浏览流程
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant App as Flutter
+    participant Local as Drift
+    participant API as FastAPI
+
+    U->>App: 点击卡片集内任意卡片
+    App->>Local: 读取 local_cards
+    Local-->>App: 卡片内容
+    App->>App: 浏览模式（明文+暗文同时展示）
+    loop 左右翻页
+        U->>App: 滑动 / 点击翻页
+        App->>Local: 读取下一张
+    end
+    U->>App: 点击「开始复习」
+    App->>App: 切换到复习模式
+    Note right of App: 浏览过程不产生 review_log
+```
+
+> **与复习模式的区别**：浏览模式**不写** `review_log`、**不显示**评分控件、**不影响**排程。用户随时可切换到复习模式。
+
+### 8.4 答疑流程
 
 ```mermaid
 sequenceDiagram
@@ -1186,7 +1610,7 @@ sequenceDiagram
     App->>U: 渲染回答 + 引用卡片
 ```
 
-### 8.4 计划生成流程
+### 8.5 计划生成流程
 
 ```mermaid
 sequenceDiagram
@@ -1378,21 +1802,35 @@ volumes:
 
 | 层 | 范围 | 工具 | 目标覆盖 |
 | --- | --- | --- | --- |
-| 单元测试 | `domain/`（FSRS、去重、校验） | pytest | ≥ 90% |
+| 单元测试 | `domain/`（排程工具、护栏、去重、校验） | pytest | ≥ 90% |
 | 集成测试 | `services/` + 真实 Postgres | pytest + testcontainers | ≥ 70% |
 | API 测试 | 路由契约 | httpx + Schemathesis | 全部端点 |
-| Agent 测试 | 图执行、interrupt/resume | pytest + 固定 LLM 桩 | 关键路径 |
+| Agent 测试 | 图执行、interrupt/resume、**排程可复现** | pytest + 固定 LLM 桩 | 关键路径 |
 | 移动端 | Widget + 单元 | flutter_test | ≥ 60% |
 | E2E | 核心链路 | integration_test | 5 条主流程 |
 | 性能 | 复习队列、搜索 | k6 | P95 达标 |
 
 ### 13.1 关键测试用例
 
-**FSRS**
-- 相同输入 → 相同输出（纯函数）
-- 间隔单调性：连续「简单」评分的间隔严格递增
+**排程工具（纯函数）**
+- `compute_retrievability`：`R(S, S) ≈ 0.9`
+- `estimate_interval`：保留率越高间隔越短
 - 边界：`stability` 极小/极大时不溢出
-- 与官方 FSRS 测试向量对齐
+
+**排程护栏（核心）**
+- 间隔单调性：连续「简单」评分的间隔严格递增
+- 间隔越界：400 天 → 钳制到 365 天
+- 过去时间：`due_at` 在过去 → 钳制到 `now + 1 天`
+- 预算超限：总耗时 > `daily_minutes × 1.15` → 按优先级截断
+- 降级：护栏失败 → 该卡片使用 FSRS 结果 + 记录告警
+
+**排程模式差异**
+- `sprint` 平均间隔 < `standard` < `strong_memory`
+- 模式切换只影响未来，不追溯历史
+
+**排程可复现**
+- 固定输入 + 固定 LLM 桩 → `SchedulePlan` 逐字段相等
+- 同一 `review_id` 重复同步 → 只排一次
 
 **制卡**
 - 加密 PDF → 明确错误
@@ -1401,9 +1839,10 @@ volumes:
 - 质检：相似卡片被标记
 
 **离线同步**
-- 飞行模式复习 → 联网重放 → 服务端一致
-- 重复 `id` 提交 → 只记一次
-- 冲突 → 服务端为准
+- 飞行模式复习 → 联网重放 → 服务端完成重排程
+- 重复 `review_id` 提交 → 只记一次
+- 自由浏览 → **不产生** `review_log`
+- 队列过期 → 提示「需联网更新排期」
 
 ---
 
@@ -1412,12 +1851,16 @@ volumes:
 | # | 风险 | 影响 | 缓解 |
 | --- | --- | --- | --- |
 | T1 | LangGraph 版本不稳定 | 中 | `AgentRuntime` 接口隔离；锁定版本 |
-| T2 | 客户端 FSRS 与服务端不一致 | 高 | 共享测试向量；服务端重算为准 |
-| T3 | pgvector 检索性能不足 | 中 | HNSW 参数调优；预留 `VectorStore` 接口 |
-| T4 | PDF 解析质量差 | 中 | 多引擎兜底（pypdf / pdfplumber / OCR） |
-| T5 | LLM 输出不稳定导致解析失败 | 高 | 结构化输出 + 重试 + 降级为纯文本 |
-| T6 | Flutter 包体积过大 | 低 | 按需加载；`--split-debug-info` |
-| T7 | 推送到达率（国内 Android） | 中 | 接入厂商推送通道（P1） |
+| T2 | **排程 Agent 输出不稳定 / 不可复现** | 高 | 温度 0 + 固定 seed + 确定性工具 + 护栏降级；快照回归测试 |
+| T3 | **排程延迟**（LLM 秒级） | 中 | 异步批量执行，不阻塞复习交互；队列预生成 |
+| T4 | pgvector 检索性能不足 | 中 | HNSW 参数调优；预留 `VectorStore` 接口 |
+| T5 | PDF 解析质量差 | 中 | 多引擎兜底（pypdf / pdfplumber / OCR） |
+| T6 | LLM 输出不稳定导致解析失败 | 高 | 结构化输出 + 重试 + 降级为纯文本 |
+| T7 | Flutter 包体积过大 | 低 | 按需加载；`--split-debug-info` |
+| T8 | 推送到达率（国内 Android） | 中 | 接入厂商推送通道（P1） |
+| T9 | 离线队列过期（用户长期不联网） | 低 | 7 天预下载 + 过期提示 + 允许消费旧队列 |
+
+> **已消除的风险**：原 T2「客户端 FSRS 与服务端不一致」——因为客户端不参与排程（ADR-004），该风险不复存在。
 
 ---
 
@@ -1425,11 +1868,12 @@ volumes:
 
 | 版本 | 内容 |
 | --- | --- |
-| **MVP (v1.0)** | 记忆卡片全链路、Agent 制卡、FSRS 复习、计划、RAG 答疑 |
+| **MVP (v1.0)** | 记忆卡片全链路、Agent 制卡、**排程 Agent（三种模式）**、卡片页面、计划、RAG 答疑 |
 | v1.1 | 扫描件 OCR、图片生成、性能优化 |
-| v1.5 | Web 制卡台、桌面端、厂商推送 |
+| v1.5 | 学习模式自定义参数、厂商推送通道 |
 | v2.0 | 卡片社区、日程卡片、灵感卡片、多人共享 |
 | v3.0 | 插件市场、自定义 Agent、开放 API |
+| 未排期 | 桌面端 / Web 制卡台（见需求文档 §8） |
 
 ---
 
@@ -1440,7 +1884,13 @@ volumes:
 | `FSRS_DECAY` | -0.5 | 遗忘曲线衰减 |
 | `FSRS_FACTOR` | 19/81 | 缩放因子 |
 | `DEFAULT_RETENTION` | 0.9 | 默认目标保留率 |
-| `NEW_PER_DAY` | 20 | 每日新卡上限 |
+| `NEW_PER_DAY` | 20 | 每日新卡上限（`standard`） |
+| `SPRINT_NEW_PER_DAY` | 50 | 冲刺模式每日新卡上限 |
+| `MIN_INTERVAL_DAYS` | 1 | 排程间隔下界 |
+| `MAX_INTERVAL_DAYS` | 365 | 排程间隔上界 |
+| `BUDGET_TOLERANCE` | 1.15 | 每日预算容忍系数 |
+| `SCHEDULE_BATCH_SIZE` | 500 | 单次排程卡片上限 |
+| `QUEUE_PREFETCH_DAYS` | 7 | 客户端预下载队列天数 |
 | `DEDUP_THRESHOLD` | 0.9 | 疑似重复相似度阈值 |
 | `CHUNK_SIZE` | 512 | 资料切分 token |
 | `CHUNK_OVERLAP` | 64 | 切分重叠 |
