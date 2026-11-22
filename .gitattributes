@@ -1,0 +1,27 @@
+# 统一换行符，避免 Windows/macOS 协作时产生无意义 diff
+* text=auto eol=lf
+
+# 明确二进制文件
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.apk binary
+*.ipa binary
+
+# 锁文件不参与 diff 统计
+pnpm-lock.yaml -diff
+pubspec.lock -diff
+poetry.lock -diff
+uv.lock -diff
+
+# Markdown 按文本处理
+*.md text eol=lf
