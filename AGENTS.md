@@ -75,6 +75,7 @@ CardSharp/
 | | ARQ | 0.26+ |
 | 数据库 | PostgreSQL + pgvector | 16 / 0.7+ |
 | 缓存/队列 | Redis | 7 |
+| 排程 | **排程 Agent + 确定性护栏 + FSRS 兜底** | — |
 | 移动端 | Flutter | 3.47.1 |
 | | Dart | 3.13.1 |
 | | Riverpod | 3.x |
@@ -82,6 +83,8 @@ CardSharp/
 | | Drift | 2.35+ |
 
 > **不要擅自升级大版本。** 需要升级时，单独开 PR 并说明迁移影响。
+>
+> **排程归属**：排程全部在服务端（`agents/graphs/scheduler.py` + `domain/scheduling_*.py`）。**客户端不引入任何排程库**，只消费已排期队列。
 
 ---
 
@@ -142,7 +145,7 @@ cd mobile;  flutter test
 
 只写「为什么」，不写「是什么」。以下情况**必须**注释：
 
-- 非显然的业务规则（如 FSRS 的 `elapsed=0` 特殊处理）
+- 非显然的业务规则（如排程中 `elapsed=0` 视为「同日复习」的特殊处理）
 - 绕过某个限制的 workaround（注明原因与移除条件）
 - 与直觉相反的性能优化
 
@@ -165,7 +168,7 @@ cd mobile;  flutter test
 **禁止**：
 - 提交被 `skip` / `xfail` 的测试（除非 PR 中说明原因）
 - 为了让测试通过而放宽断言
-- 用 mock 替代本应测的真实逻辑（如把 FSRS 也 mock 掉）
+- 用 mock 替代本应测的真实逻辑（如把排程护栏也 mock 掉）
 
 ---
 
@@ -196,16 +199,17 @@ cd mobile;  flutter test
 
 ### scope
 
-`backend` / `mobile` / `docs` / `deploy` / `ci` / `fsrs` / `generation` / `rag` / `agent` …
+`backend` / `mobile` / `docs` / `deploy` / `ci` / `scheduler` / `generation` / `rag` / `agent` …
 
 ### 示例
 
 ```
-feat(fsrs): 实现 FSRS-5 排程引擎
+feat(scheduler): 实现排程 Agent 与确定性护栏
 
-- 新增 domain/fsrs.py：纯函数实现，无 IO 依赖
-- 覆盖新卡/学习中/复习三种状态迁移
-- 连续「良好」评分的间隔严格递增（属性测试）
+- 新增 domain/scheduling_tools.py：纯函数工具，供 Agent function calling
+- 新增 domain/scheduling_guard.py：单调性/边界/预算校验
+- 新增 agents/graphs/scheduler.py：三种学习模式的决策图
+- 护栏失败时降级 FSRS 并记录 scheduler.fallback
 
 Closes #12
 ```
@@ -318,13 +322,29 @@ main            ← 受保护，只能通过 PR 合入
 
 **不需要**修改 `cards` 表、CRUD 路由、搜索逻辑。若需要，说明抽象错了。
 
-### 11.3 修改 FSRS 参数
+### 11.3 修改排程策略
+
+> **排程由 Agent 决策，但受确定性护栏约束。** 修改时三者必须同步，否则会出现「Agent 想排、护栏不让」的静默降级。
 
 ```
-1. 只改 backend/app/domain/fsrs.py 的 DEFAULT_WEIGHTS
-2. 同步更新 mobile 端的 Dart 实现（若有）
-3. 更新 docs/03-MVP设计文档.md 附录 A
-4. 跑 tests/test_fsrs.py 确认单调性未被破坏
+1. 改 backend/app/domain/scheduling_tools.py  → 数学工具（纯函数）
+2. 改 backend/app/domain/scheduling_guard.py  → 护栏规则（纯函数）
+3. 改 backend/app/agents/graphs/scheduler.py  → Agent 提示词与图
+4. 改 backend/app/domain/fsrs.py              → 仅当护栏兜底逻辑需要变
+5. 更新 docs/03-MVP设计文档.md §5.2 与附录 A
+6. 跑 tests/test_scheduling_guard.py 确认单调性/边界未被破坏
+7. 跑 tests/test_scheduler_snapshot.py 更新快照并人工 review diff
+```
+
+**禁止**：只改 Agent 提示词而不改护栏——护栏是质量底线，不能为了「让 Agent 通过」而放宽。
+
+### 11.4 新增学习模式
+
+```
+1. backend/app/domain/scheduling_tools.py   → LearnerProfile 增加枚举值
+2. backend/app/domain/scheduling_guard.py   → 确认护栏对新模式仍成立
+3. docs/02-MVP需求文档.md §5 FR-4.2        → 补充模式说明
+4. 前端设置页                              → 增加选项
 ```
 
 ---
