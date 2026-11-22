@@ -1,0 +1,119 @@
+[project]
+name = "cardsharp-backend"
+version = "0.1.0"
+description = "CardSharp 后端：FastAPI + LangGraph + PostgreSQL"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pgvector>=0.3.6",
+    "argon2-cffi>=23.1.0",
+    "pyjwt>=2.10.0",
+    "redis>=5.2.0",
+    "arq>=0.26.0",
+    "httpx>=0.28.0",
+    "openai>=1.57.0",
+    "langgraph>=0.2.60",
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "pypdf>=5.1.0",
+    "trafilatura>=2.0.0",
+    "boto3>=1.35.0",
+    "structlog>=24.4.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
+    "python-multipart>=0.0.17",
+    "email-validator>=2.2.0",
+    "orjson>=3.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+]
+
+[tool.uv]
+package = false
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "ASYNC",
+    "S",   # bandit
+    "RUF",
+]
+ignore = [
+    "S101", # assert 在测试中合法
+    "B008", # FastAPI Depends 默认参数
+    # 项目文档与注释使用中文，全角标点是刻意的
+    "RUF001", # 字符串中的全角标点
+    "RUF002", # docstring 中的全角标点
+    "RUF003", # 注释中的全角标点
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+"migrations/**" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/", "build/"]
+
+[[tool.mypy.overrides]]
+module = ["arq.*", "trafilatura.*", "boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "integration: 需要真实数据库/Redis 的集成测试",
+    "slow: 耗时较长的测试",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
