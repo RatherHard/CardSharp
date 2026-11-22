@@ -129,7 +129,16 @@ cd mobile;  flutter test
 - **命名**：文件 `snake_case.dart`，类 `PascalCase`，私有成员 `_camelCase`。
 - **常量**：`static const` 优先，避免魔法数字。
 
-### 5.3 注释
+### 5.3 生成代码
+
+`freezed` / `json_serializable` / `drift_dev` / `retrofit_generator` 产出的
+`*.freezed.dart`、`*.g.dart`、`*.drift.dart`、`*.gr.dart` **需要提交到仓库**。
+
+- 修改带注解的源文件后，必须执行 `make app-gen` 并一并提交生成结果。
+- CI 会校验生成代码是否最新（`git status --porcelain lib`），不一致直接失败。
+- **禁止**手动编辑生成文件，改动会在下次生成时丢失。
+
+### 5.4 注释
 
 只写「为什么」，不写「是什么」。以下情况**必须**注释：
 
