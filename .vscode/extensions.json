@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "dart-code.dart-code",
+    "dart-code.flutter",
+    "charliermarsh.ruff",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "redhat.vscode-yaml",
+    "editorconfig.editorconfig",
+    "tamasfe.even-better-toml",
+    "bierner.markdown-mermaid",
+    "eamodio.gitlens"
+  ]
+}

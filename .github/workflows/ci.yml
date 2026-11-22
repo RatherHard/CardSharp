@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端（lint + typecheck + test）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: cardsharp_test
+          POSTGRES_USER: cardsharp
+          POSTGRES_PASSWORD: cardsharp
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cardsharp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://cardsharp:cardsharp@localhost:5432/cardsharp_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.8.22"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: 安装 Python
+        run: uv python install 3.12
+
+      - name: 安装依赖
+        run: uv sync --all-groups --frozen
+
+      - name: Ruff 检查
+        run: uv run ruff check --output-format=github .
+
+      - name: Ruff 格式检查
+        run: uv run ruff format --check .
+
+      - name: mypy 类型检查
+        run: uv run mypy app
+
+      - name: pytest
+        run: uv run pytest --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: 上传覆盖率
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          if-no-files-found: ignore
+
+  mobile:
+    name: 移动端（analyze + test）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.1"
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get
+
+      - name: 检查生成代码是否最新
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          if [[ -n "$(git status --porcelain lib)" ]]; then
+            echo "::error::生成代码未提交，请本地执行 make app-gen"
+            git --no-pager diff --stat
+            exit 1
+          fi
+
+      - name: flutter analyze
+        run: flutter analyze --fatal-infos
+
+      - name: flutter test
+        run: flutter test --coverage
+
+      - name: 上传覆盖率
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-coverage
+          path: mobile/coverage/lcov.info
+          if-no-files-found: ignore
