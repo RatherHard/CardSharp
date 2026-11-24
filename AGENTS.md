@@ -76,8 +76,8 @@ CardSharp/
 | 数据库 | PostgreSQL + pgvector | 16 / 0.7+ |
 | 缓存/队列 | Redis | 7 |
 | 排程 | **排程 Agent + 确定性护栏 + FSRS 兜底** | — |
-| 移动端 | Flutter | 3.47.1 |
-| | Dart | 3.13.1 |
+| 移动端 | Flutter | 3.50.1 |
+| | Dart | 3.14.0 |
 | | Riverpod | 3.x |
 | | go_router | 18.x |
 | | Drift | 2.35+ |
@@ -127,6 +127,8 @@ cd mobile;  flutter test
 
 - **格式化**：`dart format --line-length 100`。
 - **静态检查**：`flutter analyze` 必须零告警（`--fatal-infos`）。
+- **UI 库**：3.50 起 Material 从 SDK 拆为独立包，统一 `import 'package:material_ui/material_ui.dart';`；
+  `package:flutter/material.dart` 已弃用，出现即让 `--fatal-infos` 失败。
 - **状态**：Riverpod `Notifier` / `AsyncNotifier`，状态用 `freezed` 定义。
 - **禁止**：Widget 内直接调 API；必须 `Widget → Notifier → UseCase → Repository`。
 - **命名**：文件 `snake_case.dart`，类 `PascalCase`，私有成员 `_camelCase`。
@@ -295,6 +297,11 @@ main            ← 受保护，只能通过 PR 合入
 | Flutter 使用国内镜像（`pub.flutter-io.cn`） | 部分包版本滞后 | 正常现象，不要强行升级 |
 | `riverpod_lint` / `custom_lint` 与 Riverpod 3.5 冲突 | 无法安装这两个 lint 插件 | 暂不安装；升级后重试 |
 | Docker 拉取 `ghcr.io` 可能超时 | TEI 嵌入服务启动失败 | 用 `profiles: [rag]` 按需启动 |
+| Flutter 3.50.1 对 AGP 有最低版本要求 | `com.android.application` 9.1.0 直接构建失败：`AGP version 9.1.0 is lower than Flutter's minimum supported version 9.1.1` | `mobile/android/settings.gradle.kts` 已固定 AGP 9.3.1 / Kotlin 2.4.20；**不要降回** |
+| Gradle 9.3.1 已进入停止支持倒计时 | 构建出现升级告警，后续 Flutter 版本将拒绝 | `mobile/android/gradle/wrapper/gradle-wrapper.properties` 已固定 `gradle-9.5.0-all` |
+| `flutter_local_notifications` / `androidx.core 1.19.0` 要求 `compileSdk ≥ 37` 且需脱糖 | 用 `flutter.compileSdkVersion`（=36）编译失败 | `mobile/android/app/build.gradle.kts` 固定 `compileSdk = 37` + `isCoreLibraryDesugaringEnabled = true` + `desugar_jdk_libs:2.1.5`；`minSdk`/`targetSdk` 不变 |
+| `services.gradle.org` 不可达 | Gradle 发行包下载卡死（只下到 3.3MB 就停） | 发行包预置到 `~/.gradle/wrapper/dists/`（本机环境，不进仓库）；镜像源 `https://mirrors.cloud.tencent.com/gradle/` |
+| GitHub HTTPS 被重置（`Recv failure: Connection was reset`） | `git clone/push` 走 HTTPS 失败 | 用 SSH：`~/.ssh/config` 已把 `github.com` 指向 `ssh.github.com:443` |
 
 **遇到新限制时，请追加到本表**，不要静默绕过。
 
