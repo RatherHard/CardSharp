@@ -6,10 +6,15 @@ plugins {
 
 android {
     namespace = "com.cardsharp.cardsharp"
-    compileSdk = flutter.compileSdkVersion
+    // 固定 37：flutter.compileSdkVersion 在 Flutter 3.50.1 仍是 36，而依赖里
+    // flutter_local_notifications 与 androidx.core 1.19.0 要求 compileSdk >= 37。
+    // compileSdk 只影响「能用到哪些 API」，不改变 minSdk/targetSdk 的运行时行为。
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications 依赖 java.time 等新 API，需要 core library desugaring。
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -42,6 +47,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {
