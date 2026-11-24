@@ -24,7 +24,7 @@
 | Git | 2.40+ | 版本控制 | [git-scm.com](https://git-scm.com/) |
 | Python | 3.12 | 后端 | 由 `uv` 自动管理 |
 | uv | 0.8+ | Python 包管理 | `winget install astral-sh.uv` |
-| Flutter | 3.47.1 | 移动端 | [flutter.dev](https://flutter.dev/) |
+| Flutter | 3.50.1 | 移动端 | [flutter.dev](https://flutter.dev/) |
 | Docker Desktop | 24+ | 本地依赖 | [docker.com](https://www.docker.com/products/docker-desktop/) |
 
 可选：`make`（Windows 可用 `choco install make`，或直接执行 `Makefile` 中的命令）。

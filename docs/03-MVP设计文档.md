@@ -45,7 +45,7 @@
 
 | 层 | 选型 | 版本 | 理由 |
 | --- | --- | --- | --- |
-| 移动端 | Flutter | 3.47 / Dart 3.13 | 单代码库覆盖 iOS + Android；**MVP 仅移动端**，不排期 Web/Desktop |
+| 移动端 | Flutter | 3.50 / Dart 3.14 | 单代码库覆盖 iOS + Android；**MVP 仅移动端**，不排期 Web/Desktop |
 | 状态管理 | Riverpod + freezed | 3.5 / 3.x | 编译期安全、易测试、无 BuildContext 依赖 |
 | 路由 | go_router | 18+ | 声明式、支持深链（推送跳转） |
 | 本地库 | Drift (SQLite) | 2.35+ | 类型安全 SQL、迁移成熟；**只存缓存与 Outbox，不存排程** |

@@ -5,7 +5,7 @@
 [![CI](https://github.com/RatherHard/CardSharp/actions/workflows/ci.yml/badge.svg)](https://github.com/RatherHard/CardSharp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](#license)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
-[![Flutter](https://img.shields.io/badge/flutter-3.47.1-blue.svg)](https://flutter.dev/)
+[![Flutter](https://img.shields.io/badge/flutter-3.50.1-blue.svg)](https://flutter.dev/)
 
 ---
 
@@ -49,7 +49,7 @@ CardSharp 不是又一个 Anki 克隆。
 
 | 层 | 选型 |
 | --- | --- |
-| 移动端 | Flutter 3.47 · Dart 3.13 · Riverpod 3 · go_router 18 · Drift |
+| 移动端 | Flutter 3.50 · Dart 3.14 · Riverpod 3 · go_router 18 · Drift |
 | 后端 | Python 3.12 · FastAPI · SQLAlchemy 2 (async) · LangGraph · ARQ |
 | 数据 | PostgreSQL 16 + pgvector · Redis 7 · S3 兼容存储 |
 | AI | OpenAI 兼容协议（DeepSeek / Qwen）· bge-m3 自托管嵌入 |
@@ -64,7 +64,7 @@ CardSharp 不是又一个 Anki 克隆。
 ### 前置要求
 
 - [uv](https://docs.astral.sh/uv/) 0.8+
-- [Flutter](https://flutter.dev/) 3.47.1
+- [Flutter](https://flutter.dev/) 3.50.1
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) 24+
 - `make`（可选，Windows 可用 `choco install make`）
 

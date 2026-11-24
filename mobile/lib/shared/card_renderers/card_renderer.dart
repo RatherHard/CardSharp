@@ -23,17 +23,14 @@ class FallbackCardRenderer implements CardRenderer {
   String get typeId => '__fallback__';
 
   @override
-  Widget buildFront(BuildContext context, Map<String, dynamic> fields) =>
-      Text(fields.toString());
+  Widget buildFront(BuildContext context, Map<String, dynamic> fields) => Text(fields.toString());
 
   @override
-  Widget buildBack(BuildContext context, Map<String, dynamic> fields) =>
-      Text(fields.toString());
+  Widget buildBack(BuildContext context, Map<String, dynamic> fields) => Text(fields.toString());
 }
 
 /// 渲染器注册表。
 final Map<String, CardRenderer> cardRenderers = <String, CardRenderer>{};
 
 /// 按类型取渲染器，未注册时降级。
-CardRenderer rendererFor(String typeId) =>
-    cardRenderers[typeId] ?? const FallbackCardRenderer();
+CardRenderer rendererFor(String typeId) => cardRenderers[typeId] ?? const FallbackCardRenderer();

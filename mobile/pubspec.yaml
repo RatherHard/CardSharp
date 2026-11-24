@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.13.1
+  sdk: ^3.14.0
 
 # SQLite 原生库来源。
 #
@@ -49,6 +49,10 @@ hooks:
 dependencies:
   flutter:
     sdk: flutter
+
+  # Flutter 3.50 起 Material 从 SDK 拆为独立包（官方入口）。
+  # 统一从本包导入，避免 package:flutter/material.dart 的弃用告警。
+  material_ui: ^1.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
