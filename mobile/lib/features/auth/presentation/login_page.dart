@@ -29,6 +29,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  /// 极简填充式输入框：不画常驻描边，靠底色区分；聚焦时才出现细描边。
+  ///
+  /// 颜色一律取自 theme，深浅色自动适配——写死色值会在暗色模式下糊成一片。
+  InputDecoration _fieldDecoration(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+  }) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final OutlineInputBorder baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide.none,
+    );
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: scheme.onSurfaceVariant),
+      filled: true,
+      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: baseBorder,
+      enabledBorder: baseBorder,
+      focusedBorder: baseBorder.copyWith(borderSide: BorderSide(color: scheme.primary, width: 1.5)),
+    );
+  }
+
   Future<void> _submit() async {
     if (_submitting) {
       return;
@@ -83,10 +108,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     controller: _usernameController,
                     textInputAction: TextInputAction.next,
                     autocorrect: false,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.loginUsernameLabel,
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
+                    decoration: _fieldDecoration(
+                      context,
+                      label: AppStrings.loginUsernameLabel,
+                      icon: Icons.person_outline,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -96,10 +121,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     obscureText: true,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _submit(),
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.loginPasswordLabel,
-                      prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
+                    decoration: _fieldDecoration(
+                      context,
+                      label: AppStrings.loginPasswordLabel,
+                      icon: Icons.lock_outline,
                     ),
                   ),
                   if (_error != null) ...<Widget>[
@@ -113,6 +138,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 24),
                   FilledButton(
                     key: const ValueKey<String>('login_submit_button'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
                     onPressed: _submitting ? null : _submit,
                     child: _submitting
                         ? const SizedBox(
