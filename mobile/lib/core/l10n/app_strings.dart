@@ -70,6 +70,73 @@ abstract final class AppStrings {
   /// 删除确认文案。删除不可恢复，必须把后果写在文案里。
   static String deleteDeckConfirm(String title) => '确定删除「$title」吗？删除后不可恢复。';
 
+  // ---------------------------------------------------------------- 卡片集详情
+  static const String deckDetailCardsTitle = '卡片列表';
+  static const String deckDetailRun = '运行';
+  static const String deckDetailNoCards = '还没有卡片';
+  static const String deckDetailNoCardsHint = '这里会显示卡片集里的卡片';
+  static const String deckDetailColumnIndex = '序号';
+  static const String deckDetailColumnPlaintext = '卡片明文';
+  static const String deckDetailColumnCiphertext = '暗文';
+
+  /// 列表里不展示暗文内容，只给一个占位，避免剧透答案。
+  static const String deckCiphertextHidden = '？？';
+  static const String deckDetailNotFound = '卡片集不存在';
+  static const String deckDetailLoadFailed = '卡片加载失败';
+  static const String cardPageTitle = '卡片页面';
+
+  // ---------------------------------------------------------------- 编辑与多选
+  static const String actionEdit = '编辑';
+  static const String actionSave = '保存';
+  static const String hintLongPressToEdit = '长按可修改';
+
+  static const String deckEditNameTitle = '修改卡片集名称';
+  static const String deckEditNameLabel = '名称';
+  static const String deckEditDescriptionTitle = '修改简介';
+  static const String deckEditDescriptionLabel = '简介';
+  static const String deckEditColorTitle = '修改封面颜色';
+  static const String deckEditColorDefault = '默认';
+  static const String deckEditFailed = '修改失败，请重试';
+
+  static const String cardEditTitle = '编辑卡片';
+  static const String cardEditPlaintextLabel = '明文';
+  static const String cardEditCiphertextLabel = '暗文';
+  static const String cardEditHintLabel = '提示';
+  static const String cardEditExtraLabel = '备注';
+  static const String cardEditOrderLabel = '序号';
+  static const String cardEditRequired = '明文和暗文都不能为空';
+  static const String cardEditTooLong = '明文不超过 200 字，暗文不超过 500 字';
+  static const String cardUpdateFailed = '保存失败，请重试';
+  static const String cardDeleteTitle = '删除卡片';
+  static const String cardDeleteConfirmText = '删除后不可恢复，确定删除这张卡片吗？';
+  static const String cardDeleteFailed = '删除失败，请重试';
+
+  static const String multiSelectEnter = '多选';
+  static const String multiSelectCancel = '取消';
+  static const String multiSelectSelectAll = '全选';
+  static const String multiSelectEmpty = '请先选择卡片';
+  static const String multiSelectDeleteTitle = '批量删除';
+
+  /// 多选模式下底部条左侧的已选计数。
+  static String multiSelectSelected(int count) => '已选 $count 项';
+
+  static String multiSelectDeleteCount(int count) => '删除（$count）';
+
+  static String multiSelectDeleteConfirm(int count) => '确定删除选中的 $count 张卡片吗？删除后不可恢复。';
+
+  // ---------------------------------------------------------------- 导入
+  static const String shelfAddMenuTitle = '添加卡片集';
+  static const String shelfAddMenuImport = '导入卡片集';
+  static const String shelfAddMenuCreate = '新建卡片集';
+  static const String importFailed = '导入失败，请检查文件';
+  static const String importErrorInvalidJson = '文件不是有效的 JSON';
+  static const String importErrorNotAnObject = '文件内容不是一份卡片集';
+  static const String importErrorMissingTitle = '缺少卡片集名称（title）';
+  static const String importErrorMissingCards = '文件里没有任何卡片';
+  static const String importErrorInvalidCard = '有卡片缺少明文或暗文，或超出字数限制';
+
+  static String importSucceeded(String title) => '已导入「$title」';
+
   // ---------------------------------------------------------------- 数据层异常
   static const String deckTitleRequired = '卡片集名称不能为空';
 

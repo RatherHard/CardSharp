@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../application/decks_controller.dart';
+import '../application/import_file_picker.dart';
 import '../domain/deck.dart';
+import '../domain/deck_import.dart';
 import 'widgets/deck_cover.dart';
 import '../../../core/l10n/app_strings.dart';
 
@@ -15,9 +17,11 @@ import '../../../core/l10n/app_strings.dart';
 /// - 长按卡片集二次确认后删除；
 /// - 未完成的功能一律进纯白占位页，不做假数据。
 class ShelfPage extends ConsumerStatefulWidget {
-  const ShelfPage({required this.onOpenDrawer, super.key});
+  const ShelfPage({this.onOpenDrawer, super.key});
 
-  final VoidCallback onOpenDrawer;
+  /// 打开侧栏的回调。外部注入时优先使用；为 null 时退回 `Scaffold.of`，
+  /// 这样在 shell 路由里由路由直接构建（拿不到外层回调）时也能打开侧栏。
+  final VoidCallback? onOpenDrawer;
 
   @override
   ConsumerState<ShelfPage> createState() => _ShelfPageState();
@@ -50,6 +54,72 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
       _showError(AppStrings.shelfCreateFailed);
     }
   }
+
+  /// 「+」先弹菜单：导入卡片集 / 新建卡片集。
+  ///
+  /// 菜单而不是直接新建，是因为导入与新建是两种入口，混在一个按钮里会让人以为
+  /// 「+」只能新建。
+  Future<void> _openAddMenu() async {
+    final _AddAction? action = await showModalBottomSheet<_AddAction>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              key: const ValueKey<String>('shelf_menu_import'),
+              leading: const Icon(Icons.file_open_outlined),
+              title: const Text(AppStrings.shelfAddMenuImport),
+              onTap: () => Navigator.of(context).pop(_AddAction.importDeck),
+            ),
+            ListTile(
+              key: const ValueKey<String>('shelf_menu_create'),
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: const Text(AppStrings.shelfAddMenuCreate),
+              onTap: () => Navigator.of(context).pop(_AddAction.createDeck),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+    if (action == _AddAction.createDeck) {
+      await _openCreateDialog();
+    } else {
+      await _importDeck();
+    }
+  }
+
+  /// 选文件 → 解析 → 写入。取消选择时静默返回。
+  Future<void> _importDeck() async {
+    final String? text = await ref.read(importFilePickerProvider).pickJsonText();
+    if (text == null || !mounted) {
+      return;
+    }
+    try {
+      final DeckImport data = parseDeckImport(text);
+      final Deck deck = await ref.read(decksControllerProvider.notifier).importDeck(data);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppStrings.importSucceeded(deck.title))));
+    } on DeckImportException catch (error) {
+      _showError(_importErrorMessage(error.error));
+    } on Object {
+      _showError(AppStrings.importFailed);
+    }
+  }
+
+  String _importErrorMessage(DeckImportError error) => switch (error) {
+    DeckImportError.invalidJson => AppStrings.importErrorInvalidJson,
+    DeckImportError.notAnObject => AppStrings.importErrorNotAnObject,
+    DeckImportError.missingTitle => AppStrings.importErrorMissingTitle,
+    DeckImportError.missingCards => AppStrings.importErrorMissingCards,
+    DeckImportError.invalidCard => AppStrings.importErrorInvalidCard,
+  };
 
   Future<void> _confirmDelete(Deck deck) async {
     final bool? confirmed = await showDialog<bool>(
@@ -95,13 +165,13 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
       children: <Widget>[
         _ShelfTopBar(
           searchController: _searchController,
-          onOpenDrawer: widget.onOpenDrawer,
+          onOpenDrawer: widget.onOpenDrawer ?? () => Scaffold.of(context).openDrawer(),
           onKeywordChanged: (String value) => setState(() => _keyword = value),
           onClearKeyword: () {
             _searchController.clear();
             setState(() => _keyword = '');
           },
-          onCreate: _openCreateDialog,
+          onCreate: _openAddMenu,
         ),
         Expanded(
           child: switch (decksAsync) {
@@ -231,6 +301,9 @@ class _ShelfTopBar extends StatelessWidget {
     );
   }
 }
+
+/// 「+」菜单的两个动作。
+enum _AddAction { importDeck, createDeck }
 
 class _CreateDeckDialog extends StatefulWidget {
   const _CreateDeckDialog();

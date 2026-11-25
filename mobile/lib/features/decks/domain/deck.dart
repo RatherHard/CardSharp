@@ -14,6 +14,10 @@ abstract class Deck with _$Deck {
     required String id,
     required String title,
     @Default('') String description,
+
+    /// 封面色，形如 `#RRGGBB`；空串表示用主题默认色。
+    /// 对应后端 `decks.color`（`docs/03` §4.2）——后端只有颜色，没有封面图片。
+    @Default('') String color,
     @Default(0) int cardCount,
   }) = _Deck;
 

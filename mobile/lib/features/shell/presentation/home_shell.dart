@@ -1,46 +1,30 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../decks/presentation/shelf_page.dart';
 import 'app_drawer.dart';
-import 'placeholder_screen.dart';
 import '../../../core/l10n/app_strings.dart';
 
-/// 主框架：底部三 Tab（卡片 / 助手 / 社区）+ 侧栏。
+/// 主框架：底部三 Tab + 侧栏。
 ///
-/// Tab 数量与顺序以设计稿 `docs/卡片页面.png` 为准（人类 2026-11-24 确认三 Tab）。
-class HomeShell extends ConsumerStatefulWidget {
-  const HomeShell({super.key});
+/// Tab 切换交给 [StatefulNavigationShell]：它持有三条独立 Navigator，
+/// 所以进入二级页面（卡片集详情）时底部栏仍在，切走再回来也不丢状态。
+class HomeShell extends StatelessWidget {
+  const HomeShell({required this.navigationShell, super.key});
 
-  @override
-  ConsumerState<HomeShell> createState() => _HomeShellState();
-}
-
-class _HomeShellState extends ConsumerState<HomeShell> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedIndex = 0;
-
-  void _openDrawer() => _scaffoldKey.currentState?.openDrawer();
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       drawer: const AppDrawer(),
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: <Widget>[
-            ShelfPage(onOpenDrawer: _openDrawer),
-            const PlaceholderScreen(),
-            const PlaceholderScreen(),
-          ],
-        ),
-      ),
+      body: SafeArea(bottom: false, child: navigationShell),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) => setState(() => _selectedIndex = index),
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (int index) => navigationShell.goBranch(
+          index,
+          // 再次点击当前 Tab 时回到该分支的根页面。
+          initialLocation: index == navigationShell.currentIndex,
+        ),
         destinations: const <NavigationDestination>[
           NavigationDestination(icon: Icon(Icons.style_outlined), label: AppStrings.tabDecks),
           NavigationDestination(

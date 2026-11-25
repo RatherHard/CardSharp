@@ -10,6 +10,7 @@ _Deck _$DeckFromJson(Map<String, dynamic> json) => _Deck(
   id: json['id'] as String,
   title: json['title'] as String,
   description: json['description'] as String? ?? '',
+  color: json['color'] as String? ?? '',
   cardCount: (json['cardCount'] as num?)?.toInt() ?? 0,
 );
 
@@ -17,5 +18,6 @@ Map<String, dynamic> _$DeckToJson(_Deck instance) => <String, dynamic>{
   'id': instance.id,
   'title': instance.title,
   'description': instance.description,
+  'color': instance.color,
   'cardCount': instance.cardCount,
 };

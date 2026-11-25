@@ -12,6 +12,11 @@ abstract interface class DeckRepository {
   /// 新建卡片集。`id` 与统计字段由实现方（将来是后端）分配。
   Future<Deck> createDeck({required String title});
 
+  /// 更新卡片集的可编辑字段：名称、简介、封面色。
+  ///
+  /// 其余字段（id、卡片数、归属）由实现方维护，调用方不得改写。
+  Future<Deck> updateDeck(Deck deck);
+
   /// 删除卡片集。`docs/02` FR-2.5 要求进回收站，本期为就地删除。
   Future<void> deleteDeck(String id);
 }

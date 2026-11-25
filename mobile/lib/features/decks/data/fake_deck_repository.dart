@@ -41,6 +41,16 @@ class FakeDeckRepository implements DeckRepository {
   }
 
   @override
+  Future<Deck> updateDeck(Deck deck) async {
+    final int index = _decks.indexWhere((Deck item) => item.id == deck.id);
+    if (index < 0) {
+      throw StateError('卡片集不存在：${deck.id}');
+    }
+    _decks[index] = deck;
+    return deck;
+  }
+
+  @override
   Future<void> deleteDeck(String id) async {
     final int index = _decks.indexWhere((Deck deck) => deck.id == id);
     if (index < 0) {

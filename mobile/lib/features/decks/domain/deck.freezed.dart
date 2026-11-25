@@ -16,7 +16,9 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Deck {
 
- String get id; String get title; String get description; int get cardCount;
+ String get id; String get title; String get description;/// 封面色，形如 `#RRGGBB`；空串表示用主题默认色。
+/// 对应后端 `decks.color`（`docs/03` §4.2）——后端只有颜色，没有封面图片。
+ String get color; int get cardCount;
 /// Create a copy of Deck
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,20 +32,20 @@ $DeckCopyWith<Deck> get copyWith => _$DeckCopyWithImpl<Deck>(this as Deck, _$ide
 @override
 bool operator ==(Object other) {
   final _this = this as Deck;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Deck&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.cardCount, _this.cardCount) || other.cardCount == _this.cardCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Deck&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.color, _this.color) || other.color == _this.color)&&(identical(other.cardCount, _this.cardCount) || other.cardCount == _this.cardCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Deck;
-  return Object.hash(runtimeType,_this.id,_this.title,_this.description,_this.cardCount);
+  return Object.hash(runtimeType,_this.id,_this.title,_this.description,_this.color,_this.cardCount);
 }
 
 @override
 String toString() {
   final _this = this as Deck;
-  return 'Deck(id: ${_this.id}, title: ${_this.title}, description: ${_this.description}, cardCount: ${_this.cardCount})';
+  return 'Deck(id: ${_this.id}, title: ${_this.title}, description: ${_this.description}, color: ${_this.color}, cardCount: ${_this.cardCount})';
 }
 
 
@@ -54,7 +56,7 @@ abstract mixin class $DeckCopyWith<$Res>  {
   factory $DeckCopyWith(Deck value, $Res Function(Deck) _then) = _$DeckCopyWithImpl;
 @useResult
 $Res call({
- String id, String title, String description, int cardCount
+ String id, String title, String description, String color, int cardCount
 });
 
 
@@ -71,11 +73,12 @@ class _$DeckCopyWithImpl<$Res>
 
 /// Create a copy of Deck
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? description = null,Object? cardCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? description = null,Object? color = null,Object? cardCount = null,}) {
   return _then(Deck(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,description: null == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String,color: null == color ? _self.color : color // ignore: cast_nullable_to_non_nullable
 as String,cardCount: null == cardCount ? _self.cardCount : cardCount // ignore: cast_nullable_to_non_nullable
 as int,
   ));
@@ -162,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String title,  String description,  int cardCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String color,  int cardCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Deck() when $default != null:
-return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
+return $default(_that.id,_that.title,_that.description,_that.color,_that.cardCount);case _:
   return orElse();
 
 }
@@ -183,10 +186,10 @@ return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String title,  String description,  int cardCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String title,  String description,  String color,  int cardCount)  $default,) {final _that = this;
 switch (_that) {
 case _Deck():
-return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
+return $default(_that.id,_that.title,_that.description,_that.color,_that.cardCount);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +206,10 @@ return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String title,  String description,  int cardCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String title,  String description,  String color,  int cardCount)?  $default,) {final _that = this;
 switch (_that) {
 case _Deck() when $default != null:
-return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
+return $default(_that.id,_that.title,_that.description,_that.color,_that.cardCount);case _:
   return null;
 
 }
@@ -218,12 +221,15 @@ return $default(_that.id,_that.title,_that.description,_that.cardCount);case _:
 @JsonSerializable()
 
 class _Deck implements Deck {
-  const _Deck({required this.id, required this.title, this.description = '', this.cardCount = 0});
+  const _Deck({required this.id, required this.title, this.description = '', this.color = '', this.cardCount = 0});
   factory _Deck.fromJson(Map<String, dynamic> json) => _$DeckFromJson(json);
 
 @override final  String id;
 @override final  String title;
 @override@JsonKey() final  String description;
+/// 封面色，形如 `#RRGGBB`；空串表示用主题默认色。
+/// 对应后端 `decks.color`（`docs/03` §4.2）——后端只有颜色，没有封面图片。
+@override@JsonKey() final  String color;
 @override@JsonKey() final  int cardCount;
 
 /// Create a copy of Deck
@@ -239,18 +245,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Deck&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.cardCount, cardCount) || other.cardCount == cardCount));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Deck&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.description, description) || other.description == description)&&(identical(other.color, color) || other.color == color)&&(identical(other.cardCount, cardCount) || other.cardCount == cardCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,title,description,cardCount);
+    return Object.hash(runtimeType,id,title,description,color,cardCount);
 }
 
 @override
 String toString() {
-    return 'Deck(id: $id, title: $title, description: $description, cardCount: $cardCount)';
+    return 'Deck(id: $id, title: $title, description: $description, color: $color, cardCount: $cardCount)';
 }
 
 
@@ -261,7 +267,7 @@ abstract mixin class _$DeckCopyWith<$Res> implements $DeckCopyWith<$Res> {
   factory _$DeckCopyWith(_Deck value, $Res Function(_Deck) _then) = __$DeckCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String title, String description, int cardCount
+ String id, String title, String description, String color, int cardCount
 });
 
 
@@ -278,11 +284,12 @@ class __$DeckCopyWithImpl<$Res>
 
 /// Create a copy of Deck
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? description = null,Object? cardCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? description = null,Object? color = null,Object? cardCount = null,}) {
   return _then(_Deck(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,description: null == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String,color: null == color ? _self.color : color // ignore: cast_nullable_to_non_nullable
 as String,cardCount: null == cardCount ? _self.cardCount : cardCount // ignore: cast_nullable_to_non_nullable
 as int,
   ));

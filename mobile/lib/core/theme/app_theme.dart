@@ -31,8 +31,11 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       filledButtonTheme: FilledButtonThemeData(
+        // 只统一圆角与内边距，**不设 minimumSize**：
+        // Size.fromHeight 会把宽度设成 infinity，按钮一旦放进 Row 就会触发
+        // 「BoxConstraints forces an infinite width」并让整块内容渲染失败。
+        // 需要通栏的地方（如登录按钮）由页面自己设置。
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),

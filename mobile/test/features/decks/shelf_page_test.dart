@@ -1,4 +1,5 @@
 import 'package:cardsharp/features/decks/application/decks_controller.dart';
+import 'package:cardsharp/features/decks/application/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_repository.dart';
@@ -11,6 +12,7 @@ Future<void> _pumpShelf(
   WidgetTester tester, {
   DeckRepository? repository,
   VoidCallback? onOpenDrawer,
+  ImportFilePicker? picker,
 }) async {
   // 默认测试视口 800x600 放不下 7 个瓦片（第 7 个不会被 build），这里加高视口。
   tester.view.physicalSize = const Size(1080, 2400);
@@ -19,7 +21,10 @@ Future<void> _pumpShelf(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [deckRepositoryProvider.overrideWithValue(repository ?? FakeDeckRepository())],
+      overrides: [
+        deckRepositoryProvider.overrideWithValue(repository ?? FakeDeckRepository()),
+        if (picker != null) importFilePickerProvider.overrideWithValue(picker),
+      ],
       child: MaterialApp(
         home: Scaffold(body: ShelfPage(onOpenDrawer: onOpenDrawer ?? () {})),
       ),
@@ -69,6 +74,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
     await tester.pumpAndSettle();
+    // 「+」现在先弹菜单，需再点「新建卡片集」。
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_create')));
+    await tester.pumpAndSettle();
 
     final FilledButton confirm = tester.widget<FilledButton>(
       find.byKey(const ValueKey<String>('create_deck_confirm')),
@@ -81,6 +89,8 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_create')));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('create_deck_field')), 'TestDeck');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey<String>('create_deck_confirm')));
@@ -88,6 +98,34 @@ void main() {
 
     expect(find.text('TestDeck'), findsOneWidget);
     expect(find.text('0 张卡片'), findsNWidgets(7));
+  });
+
+  testWidgets('从菜单导入卡片集后列表出现新卡片集', (WidgetTester tester) async {
+    await _pumpShelf(
+      tester,
+      picker: const _FakePicker(
+        '{"title":"导入的卡片集","cards":[{"plaintext":"问一","ciphertext":"答一"}]}',
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('导入的卡片集'), findsOneWidget);
+    expect(find.text('1 张卡片'), findsOneWidget);
+  });
+
+  testWidgets('导入非法 JSON 时给出错误提示', (WidgetTester tester) async {
+    await _pumpShelf(tester, picker: const _FakePicker('not json at all'));
+
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('文件不是有效的 JSON'), findsOneWidget);
   });
 
   testWidgets('长按卡片集二次确认后删除', (WidgetTester tester) async {
@@ -142,5 +180,18 @@ class _BrokenRepository implements DeckRepository {
   Future<Deck> createDeck({required String title}) async => throw StateError('boom');
 
   @override
+  Future<Deck> updateDeck(Deck deck) async => throw StateError('boom');
+
+  @override
   Future<void> deleteDeck(String id) async => throw StateError('boom');
+}
+
+/// 固定返回一段 JSON 文本，用来替代系统文件选择器。
+class _FakePicker implements ImportFilePicker {
+  const _FakePicker(this.text);
+
+  final String text;
+
+  @override
+  Future<String?> pickJsonText() async => text;
 }

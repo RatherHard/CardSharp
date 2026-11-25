@@ -11,7 +11,11 @@ import '../../../../core/l10n/app_strings.dart';
 /// 这里改成四张、角度均分并在最上面一张加一点向下位移，
 /// 让「一摞卡」在任何尺寸下都能完整露出，不被裁切。
 class DeckCover extends StatelessWidget {
-  const DeckCover({super.key});
+  const DeckCover({this.tint, super.key});
+
+  /// 封面色（来自 `Deck.color`）。为 null 时用主题的 surface 色，即原样白卡。
+  /// 这里只做低透明度着色，避免整块纯色盖掉「一摞纸」的层次。
+  final Color? tint;
 
   /// 从后到前：越靠后的卡角度越负，最上面一张保持 0°。
   static const List<double> _anglesDeg = <double>[-15, -10, -5, 0];
@@ -64,7 +68,9 @@ class DeckCover extends StatelessWidget {
                   alignment: Alignment.bottomRight,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: scheme.surface,
+                      color: tint == null
+                          ? scheme.surface
+                          : Color.alphaBlend(tint!.withValues(alpha: 0.14), scheme.surface),
                       borderRadius: BorderRadius.circular(radius),
                       border: Border.all(color: outline),
                       boxShadow: <BoxShadow>[
