@@ -7,6 +7,7 @@ import '../application/decks_controller.dart';
 import '../application/import_file_picker.dart';
 import '../domain/deck.dart';
 import '../domain/deck_import.dart';
+import '../domain/deck_repository.dart';
 import 'widgets/deck_cover.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/network/api_error.dart';
@@ -52,9 +53,15 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     }
     try {
       await ref.read(decksControllerProvider.notifier).create(title);
+    } on DeckException catch (error) {
+      // 数据层只给失败原因，文案在这里翻译（`AppStrings`）。
+      _showError(switch (error.failure) {
+        DeckFailure.titleRequired => AppStrings.deckTitleRequired,
+        DeckFailure.notFound => AppStrings.shelfCreateFailed,
+      });
     } on ApiError catch (error) {
       // 后端已给出可展示的说明，直接用，不再套「请重试」。
-      _showError(error.message);
+      _showError(error.message ?? AppStrings.unknownError);
     } on Object {
       _showError(AppStrings.shelfCreateFailed);
     }
@@ -142,7 +149,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     } on DeckImportException catch (error) {
       _showError(_importErrorMessage(error.error));
     } on ApiError catch (error) {
-      _showError(error.message);
+      _showError(error.message ?? AppStrings.unknownError);
     } on Object {
       _showError(AppStrings.importFailed);
     }
@@ -181,6 +188,11 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     }
     try {
       await ref.read(decksControllerProvider.notifier).delete(deck.id);
+    } on DeckException catch (error) {
+      _showError(switch (error.failure) {
+        DeckFailure.notFound => AppStrings.deckNotFound(deck.id),
+        DeckFailure.titleRequired => AppStrings.shelfDeleteFailed,
+      });
     } on Object {
       _showError(AppStrings.shelfDeleteFailed);
     }

@@ -1,6 +1,7 @@
 import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
+import 'package:cardsharp/features/decks/domain/deck_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -74,7 +75,7 @@ void main() {
     test('新建：空名称抛 ArgumentError 且不写入', () async {
       final repository = FakeDeckRepository();
 
-      await expectLater(repository.createDeck(title: '   '), throwsArgumentError);
+      await expectLater(repository.createDeck(title: '   '), throwsA(isA<DeckException>()));
       expect((await repository.fetchDecks(limit: 100)).items.length, kSeedDecks.length);
     });
 
@@ -122,7 +123,7 @@ void main() {
     test('删除不存在的卡片集抛 StateError', () async {
       final repository = FakeDeckRepository();
 
-      expect(() => repository.deleteDeck('missing'), throwsStateError);
+      expect(() => repository.deleteDeck('missing'), throwsA(isA<DeckException>()));
     });
 
     test('两个实例互不影响', () async {

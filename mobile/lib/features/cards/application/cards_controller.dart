@@ -1,14 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/repository_providers.dart';
 import '../../../core/network/page.dart';
-import '../data/fake_card_repository.dart';
 import '../domain/card.dart';
 import '../domain/card_repository.dart';
-
-/// 注入点：接后端时把这里换成 `HttpCardRepository`，页面无需改动。
-final Provider<CardRepository> cardRepositoryProvider = Provider<CardRepository>(
-  (Ref ref) => FakeCardRepository(),
-);
 
 /// 某个卡片集下的卡片列表。参数为 deckId。
 ///

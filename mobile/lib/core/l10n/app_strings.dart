@@ -143,9 +143,29 @@ abstract final class AppStrings {
 
   static String importSucceeded(String title) => '已导入「$title」';
 
-  // ---------------------------------------------------------------- 数据层异常
+  // ---------------------------------------------------------------- 数据层异常的展示文案
+  //
+  // 数据层（domain / data）只抛枚举（`AuthFailure` / `DeckFailure` / `CardFailure`），
+  // 中文统一在这里翻译，避免同一句话在数据层与展示层各写一套。
   static const String deckTitleRequired = '卡片集名称不能为空';
 
-  /// 删除时找不到对应卡片集。
+  /// 删除或更新时找不到对应卡片集。
   static String deckNotFound(String id) => '卡片集不存在：$id';
+
+  /// 后端异常但没有给出可展示说明时的兜底。
+  static const String unknownError = '未知错误';
+
+  // ---------------------------------------------------------------- 设置页
+  static const String settingsAccountTitle = '账号';
+  static const String settingsLocalAccountTag = '本地测试账号';
+  static const String settingsAppearanceTitle = '外观';
+  static const String settingsThemeSystem = '跟随系统';
+  static const String settingsThemeLight = '浅色';
+  static const String settingsThemeDark = '深色';
+  static const String settingsAppearanceHint = '选择后立即生效，重启应用后保持。';
+  static const String settingsAboutTitle = '关于';
+
+  /// 版本号：与 `mobile/pubspec.yaml` 的 `version` 保持一致，改版本时两处一起改。
+  static const String appVersion = '1.0.0+1';
+  static const String settingsVersionLabel = '版本';
 }

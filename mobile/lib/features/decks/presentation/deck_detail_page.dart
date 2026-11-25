@@ -199,7 +199,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
           .read(decksControllerProvider.notifier)
           .updateDeck(widget.deckId, title: title, description: description, color: color);
     } on ApiError catch (error) {
-      _showMessage(error.message);
+      _showMessage(error.message ?? AppStrings.unknownError);
     } on Object {
       _showMessage(AppStrings.deckEditFailed);
     }
@@ -254,7 +254,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     try {
       await ref.read(cardActionsProvider).update(edited);
     } on ApiError catch (error) {
-      _showMessage(error.message);
+      _showMessage(error.message ?? AppStrings.unknownError);
     } on Object {
       _showMessage(AppStrings.cardUpdateFailed);
     }
@@ -286,7 +286,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     try {
       await ref.read(cardActionsProvider).delete(deck.id, card.id);
     } on ApiError catch (error) {
-      _showMessage(error.message);
+      _showMessage(error.message ?? AppStrings.unknownError);
     } on Object {
       _showMessage(AppStrings.cardDeleteFailed);
     }
@@ -327,7 +327,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
       await ref.read(cardActionsProvider).deleteMany(deck.id, _selected.toList());
       _exitSelection();
     } on ApiError catch (error) {
-      _showMessage(error.message);
+      _showMessage(error.message ?? AppStrings.unknownError);
     } on Object {
       _showMessage(AppStrings.cardDeleteFailed);
     }

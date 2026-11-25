@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../application/auth_controller.dart';
+import '../domain/auth_repository.dart';
 import '../domain/development_account.dart';
 import '../../../core/l10n/app_strings.dart';
 
@@ -62,7 +63,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _submitting = true;
       _error = null;
     });
-    final String? error = await ref
+    final AuthFailure? failure = await ref
         .read(authControllerProvider.notifier)
         .signIn(username: _usernameController.text, password: _passwordController.text);
     if (!mounted) {
@@ -70,7 +71,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
     setState(() {
       _submitting = false;
-      _error = error;
+      // 数据层只给失败原因，文案在展示层翻译（`AppStrings`）。
+      _error = switch (failure) {
+        null => null,
+        AuthFailure.invalidCredentials => AppStrings.loginInvalidCredentials,
+        AuthFailure.unknown => AppStrings.unknownError,
+      };
     });
   }
 

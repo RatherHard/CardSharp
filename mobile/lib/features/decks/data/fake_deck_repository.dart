@@ -16,8 +16,8 @@ const List<Deck> kSeedDecks = <Deck>[
 
 /// 内存实现的卡片集仓储，供 UI 开发与测试使用。
 ///
-/// 接后端后新增 `HttpDeckRepository implements DeckRepository`，在
-/// `deckRepositoryProvider` 处替换即可；页面、Notifier、用例都不动。
+/// 接后端后新增 `HttpDeckRepository implements DeckRepository`，在组合根
+/// （`main.dart`）替换注入即可；页面、Notifier、用例都不动。
 class FakeDeckRepository implements DeckRepository {
   FakeDeckRepository([List<Deck> seed = kSeedDecks, this.cardCounter])
     : _decks = List<Deck>.of(seed),
@@ -27,7 +27,9 @@ class FakeDeckRepository implements DeckRepository {
   int _nextId;
 
   /// 统计卡片数的回调，仅假实现使用：真实数量应由后端 `stats` 提供。
-  /// 由 `deckRepositoryProvider` 注入，避免假仓储自己跨 feature 读卡片数据。
+  ///
+  /// 由组合根注入（`main.dart` 里传 `FakeCardRepository.countFor`），
+  /// 这样假卡片集仓储不需要跨 feature 直接读卡片数据。
   final int Function(String deckId)? cardCounter;
 
   @override
@@ -53,7 +55,7 @@ class FakeDeckRepository implements DeckRepository {
   Future<Deck> createDeck({required String title}) async {
     final String normalizedTitle = title.trim();
     if (normalizedTitle.isEmpty) {
-      throw ArgumentError.value(title, 'title', '卡片集名称不能为空');
+      throw const DeckException(DeckFailure.titleRequired);
     }
 
     final Deck deck = Deck(id: '${_nextId++}', title: normalizedTitle);
@@ -65,7 +67,7 @@ class FakeDeckRepository implements DeckRepository {
   Future<Deck> updateDeck(String id, {String? title, String? description, String? color}) async {
     final int index = _decks.indexWhere((Deck item) => item.id == id);
     if (index < 0) {
-      throw StateError('卡片集不存在：$id');
+      throw const DeckException(DeckFailure.notFound);
     }
     // 局部更新语义：只改传进来的字段，其余字段保持原值。
     final Deck current = _decks[index];
@@ -82,7 +84,7 @@ class FakeDeckRepository implements DeckRepository {
   Future<void> deleteDeck(String id) async {
     final int index = _decks.indexWhere((Deck deck) => deck.id == id);
     if (index < 0) {
-      throw StateError('卡片集不存在：$id');
+      throw const DeckException(DeckFailure.notFound);
     }
     _decks.removeAt(index);
   }

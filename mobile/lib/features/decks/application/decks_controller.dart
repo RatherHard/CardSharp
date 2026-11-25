@@ -1,46 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/repository_providers.dart';
 import '../../../core/network/page.dart';
-import '../../cards/application/cards_controller.dart';
-import '../../cards/data/fake_card_repository.dart';
-import '../../cards/domain/card_repository.dart';
-import '../data/fake_deck_repository.dart';
 import '../domain/deck.dart';
 import '../domain/deck_import.dart';
-import '../domain/deck_repository.dart';
 import 'use_cases/create_deck_use_case.dart';
 import 'use_cases/delete_deck_use_case.dart';
 import 'use_cases/fetch_decks_use_case.dart';
 import 'use_cases/import_deck_use_case.dart';
 import 'use_cases/update_deck_use_case.dart';
 
-/// 数据源注入点：接后端时只改这一处（`HttpDeckRepository(ref)`）。
-///
-/// 假实现注入 `cardCounter`：卡片数由卡片仓储统计，避免假仓储之间互相依赖。
-/// 接后端后这个参数不再需要——统计由服务端 `decks.stats` 提供。
-final deckRepositoryProvider = Provider<DeckRepository>((ref) {
-  final CardRepository cards = ref.watch(cardRepositoryProvider);
-  return FakeDeckRepository(kSeedDecks, cards is FakeCardRepository ? cards.countFor : null);
-});
-
-/// 用例注入点。状态层只依赖用例，不直接碰仓储实现（`AGENTS.md` §5.2 分层约定）。
+/// 用例注入点。状态层只依赖用例与 domain 接口，不出现任何 data 层实现
+/// （`AGENTS.md` §5.2 分层约定；仓储端口声明在 `core/di/repository_providers.dart`）。
 final fetchDecksUseCaseProvider = Provider<FetchDecksUseCase>(
-  (ref) => FetchDecksUseCase(ref.watch(deckRepositoryProvider)),
+  (Ref ref) => FetchDecksUseCase(ref.watch(deckRepositoryProvider)),
 );
 final createDeckUseCaseProvider = Provider<CreateDeckUseCase>(
-  (ref) => CreateDeckUseCase(ref.watch(deckRepositoryProvider)),
+  (Ref ref) => CreateDeckUseCase(ref.watch(deckRepositoryProvider)),
 );
 final deleteDeckUseCaseProvider = Provider<DeleteDeckUseCase>(
-  (ref) => DeleteDeckUseCase(ref.watch(deckRepositoryProvider)),
+  (Ref ref) => DeleteDeckUseCase(ref.watch(deckRepositoryProvider)),
 );
 final updateDeckUseCaseProvider = Provider<UpdateDeckUseCase>(
-  (ref) => UpdateDeckUseCase(ref.watch(deckRepositoryProvider)),
+  (Ref ref) => UpdateDeckUseCase(ref.watch(deckRepositoryProvider)),
 );
 
-/// 导入用例需要同时用到卡片仓储，属于应用层编排（组合两个 feature 的仓储）。
+/// 导入用例需要同时用到卡片仓储，属于应用层编排（组合两个 feature 的 domain 接口）。
 /// 这是本仓库唯一一处跨 feature 的 application 依赖，注释保留原因。
 final importDeckUseCaseProvider = Provider<ImportDeckUseCase>(
-  (ref) => ImportDeckUseCase(ref.watch(deckRepositoryProvider), ref.watch(cardRepositoryProvider)),
+  (Ref ref) =>
+      ImportDeckUseCase(ref.watch(deckRepositoryProvider), ref.watch(cardRepositoryProvider)),
 );
 
 /// 书架列表状态：已加载的卡片集 + 下一页游标。

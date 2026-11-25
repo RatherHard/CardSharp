@@ -9,14 +9,17 @@ import 'package:cardsharp/features/decks/application/use_cases/delete_deck_use_c
 import 'package:cardsharp/features/decks/application/use_cases/fetch_decks_use_case.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
+import 'package:cardsharp/features/decks/domain/deck_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/in_memory_auth_storage.dart';
 
 /// 用例层是薄壳，但仍要验证「调对了实现、错误原样冒泡」，
 /// 否则接后端换实现时用例层出错不会被测试发现。
 void main() {
   group('认证用例', () {
     test('SignIn 把账号密码交给仓储并返回用户', () async {
-      final repository = FakeAuthRepository();
+      final repository = FakeAuthRepository(InMemoryAuthStorage());
       final useCase = SignInUseCase(repository);
 
       final user = await useCase(
@@ -28,7 +31,7 @@ void main() {
     });
 
     test('SignIn 把仓储的认证失败原样抛给上层', () async {
-      final useCase = SignInUseCase(FakeAuthRepository());
+      final useCase = SignInUseCase(FakeAuthRepository(InMemoryAuthStorage()));
 
       await expectLater(
         useCase(username: DevelopmentAccount.username, password: 'wrong'),
@@ -37,7 +40,7 @@ void main() {
     });
 
     test('SignOut 清掉仓储里的登录态', () async {
-      final repository = FakeAuthRepository();
+      final repository = FakeAuthRepository(InMemoryAuthStorage());
       await repository.signIn(
         username: DevelopmentAccount.username,
         password: DevelopmentAccount.password,
@@ -72,7 +75,7 @@ void main() {
     test('DeleteDeck 删除不存在的 id 时抛 StateError', () async {
       final useCase = DeleteDeckUseCase(FakeDeckRepository());
 
-      await expectLater(useCase('not-exist'), throwsA(isA<StateError>()));
+      await expectLater(useCase('not-exist'), throwsA(isA<DeckException>()));
     });
   });
 }

@@ -1,8 +1,7 @@
+import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/core/theme/app_theme.dart';
-import 'package:cardsharp/features/cards/application/cards_controller.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
 import 'package:cardsharp/features/cards/domain/card.dart';
-import 'package:cardsharp/features/decks/application/decks_controller.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/presentation/deck_detail_page.dart';

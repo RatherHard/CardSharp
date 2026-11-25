@@ -22,6 +22,8 @@ class FakeCardRepository implements CardRepository {
   int _seq = 0;
 
   /// 某卡片集下的卡片数量。供假卡片集仓储展示用，接后端后由 `stats` 取代。
+  ///
+  /// 由组合根把它传给 `FakeDeckRepository`，避免两个假仓储互相 import。
   int countFor(String deckId) => _cards[deckId]?.length ?? 0;
 
   @override
@@ -45,11 +47,11 @@ class FakeCardRepository implements CardRepository {
   Future<Card> updateCard(Card card) async {
     final List<Card>? cards = _cards[card.deckId];
     if (cards == null) {
-      throw StateError('卡片集不存在：${card.deckId}');
+      throw const CardException(CardFailure.deckNotFound);
     }
     final int index = cards.indexWhere((Card item) => item.id == card.id);
     if (index < 0) {
-      throw StateError('卡片不存在：${card.id}');
+      throw const CardException(CardFailure.cardNotFound);
     }
     cards[index] = card;
     return card;
@@ -64,7 +66,7 @@ class FakeCardRepository implements CardRepository {
         return;
       }
     }
-    throw StateError('卡片不存在：$id');
+    throw const CardException(CardFailure.cardNotFound);
   }
 
   @override

@@ -6,14 +6,17 @@
 /// 现阶段还没有 HTTP 实现，这个类型先建好：等 `HttpRepository` 接上后，
 /// 把响应体解析成 [ApiError] 抛出，页面按 `code` 决定提示与跳转，
 /// 不再一律显示「请重试」。
+///
+/// [message] 允许为 null：后端可能只给 `code`（例如网关返回的空体），
+/// 这时由展示层退回 `AppStrings.unknownError`，而不是在数据层写死中文。
 class ApiError implements Exception {
-  const ApiError({required this.code, required this.message, this.requestId});
+  const ApiError({required this.code, this.message, this.requestId});
 
   /// 业务错误码，例如 `DECK_NOT_FOUND`、`VALIDATION_FAILED`、`UNAUTHORIZED`。
   final String code;
 
-  /// 可直接展示给用户的错误说明（后端已本地化）。
-  final String message;
+  /// 后端已本地化的错误说明；为 null 表示后端没给。
+  final String? message;
 
   /// 请求 id，用于和后端日志对照。
   final String? requestId;
@@ -22,11 +25,11 @@ class ApiError implements Exception {
   factory ApiError.fromJson(Map<String, dynamic> json) {
     final Object? payload = json['error'];
     if (payload is! Map<String, dynamic>) {
-      return const ApiError(code: 'UNKNOWN', message: '未知错误');
+      return const ApiError(code: 'UNKNOWN');
     }
     return ApiError(
       code: payload['code'] as String? ?? 'UNKNOWN',
-      message: payload['message'] as String? ?? '未知错误',
+      message: payload['message'] as String?,
       requestId: payload['request_id'] as String?,
     );
   }

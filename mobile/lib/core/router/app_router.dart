@@ -7,6 +7,7 @@ import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/decks/presentation/deck_detail_page.dart';
 import '../../features/decks/presentation/shelf_page.dart';
+import '../../features/settings/presentation/settings_page.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/shell/presentation/placeholder_screen.dart';
 import '../l10n/app_strings.dart';
@@ -69,7 +70,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                   GoRoute(
                     path: 'settings',
                     name: 'settings',
-                    builder: (_, _) => const PlaceholderScreen(title: AppStrings.settings),
+                    builder: (_, _) => const SettingsPage(),
                   ),
                 ],
               ),

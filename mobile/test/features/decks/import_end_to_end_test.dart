@@ -1,14 +1,15 @@
+import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/app.dart';
-import 'package:cardsharp/features/auth/application/auth_controller.dart';
 import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/development_account.dart';
-import 'package:cardsharp/features/cards/application/cards_controller.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
-import 'package:cardsharp/features/decks/application/decks_controller.dart';
 import 'package:cardsharp/features/decks/application/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/in_memory_auth_storage.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 const String _sampleJson = '''
@@ -39,7 +40,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+          authRepositoryProvider.overrideWithValue(FakeAuthRepository(InMemoryAuthStorage())),
           deckRepositoryProvider.overrideWithValue(FakeDeckRepository()),
           cardRepositoryProvider.overrideWithValue(FakeCardRepository()),
           importFilePickerProvider.overrideWithValue(const _FakePicker()),

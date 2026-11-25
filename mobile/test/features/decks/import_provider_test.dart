@@ -1,6 +1,9 @@
+import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/features/cards/application/cards_controller.dart';
+import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
 import 'package:cardsharp/features/cards/domain/card.dart';
 import 'package:cardsharp/features/decks/application/decks_controller.dart';
+import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_import.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +14,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// 这个测试能抓到「两个 Provider 拿到不同仓储实例」这类问题。
 void main() {
   test('导入后通过 Provider 读卡片能读到', () async {
-    final ProviderContainer container = ProviderContainer();
+    // 仓储由组合根注入；测试里用同一份内存实现，模拟 main.dart 的装配方式。
+    final FakeCardRepository cards = FakeCardRepository();
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        cardRepositoryProvider.overrideWithValue(cards),
+        deckRepositoryProvider.overrideWithValue(FakeDeckRepository(kSeedDecks, cards.countFor)),
+      ],
+    );
     addTearDown(container.dispose);
 
     final Deck deck = await container
@@ -29,9 +39,9 @@ void main() {
           ),
         );
 
-    final List<Card> cards = await container.read(cardsForDeckProvider(deck.id).future);
+    final List<Card> loaded = await container.read(cardsForDeckProvider(deck.id).future);
 
-    expect(cards, hasLength(3));
-    expect(cards.first.fields.plaintext, '问一');
+    expect(loaded, hasLength(3));
+    expect(loaded.first.fields.plaintext, '问一');
   });
 }

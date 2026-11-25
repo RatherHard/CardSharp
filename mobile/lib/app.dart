@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 
 /// 应用根组件。
 ///
@@ -14,12 +15,14 @@ class CardSharpApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(routerProvider);
+    // 偏好还没读出来时按「跟随系统」处理：与用户无操作时的默认行为一致。
+    final ThemeMode themeMode = ref.watch(themeModeControllerProvider).value ?? ThemeMode.system;
     return MaterialApp.router(
       title: 'CardSharp',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
