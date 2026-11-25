@@ -110,6 +110,9 @@ jobs:
             exit 1
           fi
 
+      - name: 检查格式
+        run: dart format --line-length 100 --set-exit-if-changed lib test
+
       - name: flutter analyze
         run: flutter analyze --fatal-infos
 
