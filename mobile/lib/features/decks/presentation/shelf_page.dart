@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../application/bundled_deck_loader.dart';
 import '../application/decks_controller.dart';
 import '../application/import_file_picker.dart';
 import '../domain/deck.dart';
@@ -59,7 +60,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     }
   }
 
-  /// 「+」先弹菜单：导入卡片集 / 新建卡片集。
+  /// 「+」先弹菜单：导入卡片集 / 导入示例卡片集 / 新建卡片集。
   ///
   /// 菜单而不是直接新建，是因为导入与新建是两种入口，混在一个按钮里会让人以为
   /// 「+」只能新建。
@@ -76,6 +77,13 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
               title: const Text(AppStrings.shelfAddMenuImport),
               onTap: () => Navigator.of(context).pop(_AddAction.importDeck),
             ),
+            // 内置示例：没有后端、手机里也没有现成 json 时的演示入口。
+            ListTile(
+              key: const ValueKey<String>('shelf_menu_import_sample'),
+              leading: const Icon(Icons.auto_awesome_outlined),
+              title: const Text(AppStrings.shelfAddMenuImportSample),
+              onTap: () => Navigator.of(context).pop(_AddAction.importSampleDeck),
+            ),
             ListTile(
               key: const ValueKey<String>('shelf_menu_create'),
               leading: const Icon(Icons.create_new_folder_outlined),
@@ -89,19 +97,40 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     if (!mounted || action == null) {
       return;
     }
-    if (action == _AddAction.createDeck) {
-      await _openCreateDialog();
-    } else {
-      await _importDeck();
+    switch (action) {
+      case _AddAction.createDeck:
+        await _openCreateDialog();
+      case _AddAction.importDeck:
+        await _pickAndImportDeck();
+      case _AddAction.importSampleDeck:
+        await _importSampleDeck();
     }
   }
 
-  /// 选文件 → 解析 → 写入。取消选择时静默返回。
-  Future<void> _importDeck() async {
+  /// 用户自选文件 → 解析 → 写入。取消选择时静默返回。
+  Future<void> _pickAndImportDeck() async {
     final String? text = await ref.read(importFilePickerProvider).pickJsonText();
     if (text == null || !mounted) {
       return;
     }
+    await _applyImport(text);
+  }
+
+  /// 应用内置示例 → 解析 → 写入。与自选文件共用 `_applyImport`，避免两条导入路径分叉。
+  Future<void> _importSampleDeck() async {
+    try {
+      final String text = await ref.read(bundledDeckLoaderProvider).loadExampleDeckJson();
+      if (!mounted) {
+        return;
+      }
+      await _applyImport(text);
+    } on Object {
+      _showError(AppStrings.importFailed);
+    }
+  }
+
+  /// 把一份卡片集 JSON 写入本地仓储，并给出反馈。
+  Future<void> _applyImport(String text) async {
     try {
       final DeckImport data = parseDeckImport(text);
       final Deck deck = await ref.read(decksControllerProvider.notifier).importDeck(data);
@@ -333,7 +362,7 @@ class _ShelfTopBar extends StatelessWidget {
 }
 
 /// 「+」菜单的两个动作。
-enum _AddAction { importDeck, createDeck }
+enum _AddAction { importDeck, importSampleDeck, createDeck }
 
 class _CreateDeckDialog extends StatefulWidget {
   const _CreateDeckDialog();

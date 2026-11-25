@@ -130,6 +130,9 @@ abstract final class AppStrings {
   // ---------------------------------------------------------------- 导入
   static const String shelfAddMenuTitle = '添加卡片集';
   static const String shelfAddMenuImport = '导入卡片集';
+
+  /// 内置示例卡片集：应用自带一份 JSON，演示时不必先往手机里传文件。
+  static const String shelfAddMenuImportSample = '导入示例卡片集';
   static const String shelfAddMenuCreate = '新建卡片集';
   static const String importFailed = '导入失败，请检查文件';
   static const String importErrorInvalidJson = '文件不是有效的 JSON';
