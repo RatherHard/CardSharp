@@ -1,3 +1,6 @@
+import 'package:cardsharp/core/network/page.dart';
+import 'package:cardsharp/features/cards/application/cards_controller.dart';
+import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
 import 'package:cardsharp/features/decks/application/decks_controller.dart';
 import 'package:cardsharp/features/decks/application/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
@@ -19,10 +22,15 @@ Future<void> _pumpShelf(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
+  // 与 deckRepositoryProvider 的装配保持一致：卡片数由卡片仓储统计。
+  final FakeCardRepository cards = FakeCardRepository();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        deckRepositoryProvider.overrideWithValue(repository ?? FakeDeckRepository()),
+        cardRepositoryProvider.overrideWithValue(cards),
+        deckRepositoryProvider.overrideWithValue(
+          repository ?? FakeDeckRepository(kSeedDecks, cards.countFor),
+        ),
         if (picker != null) importFilePickerProvider.overrideWithValue(picker),
       ],
       child: MaterialApp(
@@ -174,13 +182,15 @@ void main() {
 
 class _BrokenRepository implements DeckRepository {
   @override
-  Future<List<Deck>> fetchDecks() async => throw StateError('boom');
+  Future<PagedResult<Deck>> fetchDecks({String? cursor, int limit = 20}) async =>
+      throw StateError('boom');
 
   @override
   Future<Deck> createDeck({required String title}) async => throw StateError('boom');
 
   @override
-  Future<Deck> updateDeck(Deck deck) async => throw StateError('boom');
+  Future<Deck> updateDeck(String id, {String? title, String? description, String? color}) async =>
+      throw StateError('boom');
 
   @override
   Future<void> deleteDeck(String id) async => throw StateError('boom');

@@ -8,6 +8,7 @@ import '../domain/deck.dart';
 import '../domain/deck_import.dart';
 import 'widgets/deck_cover.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/network/api_error.dart';
 
 /// 书架首页：卡片集网格 + 搜索 + 新建入口。
 ///
@@ -50,6 +51,9 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     }
     try {
       await ref.read(decksControllerProvider.notifier).create(title);
+    } on ApiError catch (error) {
+      // 后端已给出可展示的说明，直接用，不再套「请重试」。
+      _showError(error.message);
     } on Object {
       _showError(AppStrings.shelfCreateFailed);
     }
@@ -108,6 +112,8 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
           .showSnackBar(SnackBar(content: Text(AppStrings.importSucceeded(deck.title))));
     } on DeckImportException catch (error) {
       _showError(_importErrorMessage(error.error));
+    } on ApiError catch (error) {
+      _showError(error.message);
     } on Object {
       _showError(AppStrings.importFailed);
     }
@@ -160,7 +166,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<List<Deck>> decksAsync = ref.watch(decksControllerProvider);
+    final AsyncValue<DeckListState> decksAsync = ref.watch(decksControllerProvider);
     return Column(
       children: <Widget>[
         _ShelfTopBar(
@@ -174,19 +180,29 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
           onCreate: _openAddMenu,
         ),
         Expanded(
-          child: switch (decksAsync) {
-            AsyncData<List<Deck>>(:final List<Deck> value) => _buildGrid(context, value),
-            AsyncError<List<Deck>>() => _ErrorState(
-              onRetry: () => ref.invalidate(decksControllerProvider),
-            ),
-            _ => const Center(child: CircularProgressIndicator()),
-          },
+          // 滚到距底部 200 像素时自动取下一页；重复触发由 Notifier 内部去重。
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification notification) {
+              if (notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
+                ref.read(decksControllerProvider.notifier).loadMore();
+              }
+              return false;
+            },
+            child: switch (decksAsync) {
+              AsyncData<DeckListState>(:final DeckListState value) => _buildGrid(context, value),
+              AsyncError<DeckListState>() => _ErrorState(
+                onRetry: () => ref.invalidate(decksControllerProvider),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildGrid(BuildContext context, List<Deck> decks) {
+  Widget _buildGrid(BuildContext context, DeckListState state) {
+    final List<Deck> decks = state.decks;
     final String keyword = _keyword.trim().toLowerCase();
     final List<Deck> visible = keyword.isEmpty
         ? decks
@@ -213,25 +229,39 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: _columns,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 12,
-        childAspectRatio: _tileAspectRatio,
-      ),
-      itemCount: visible.length,
-      itemBuilder: (BuildContext context, int index) {
-        final Deck deck = visible[index];
-        return DeckTile(
-          deckId: deck.id,
-          title: deck.title,
-          cardCount: deck.cardCount,
-          onTap: () => context.push('/deck/${deck.id}'),
-          onLongPress: () => _confirmDelete(deck),
-        );
-      },
+    return Stack(
+      children: <Widget>[
+        GridView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _columns,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 12,
+            childAspectRatio: _tileAspectRatio,
+          ),
+          itemCount: visible.length,
+          itemBuilder: (BuildContext context, int index) {
+            final Deck deck = visible[index];
+            return DeckTile(
+              deckId: deck.id,
+              title: deck.title,
+              cardCount: deck.cardCount,
+              onTap: () => context.push('/deck/${deck.id}'),
+              onLongPress: () => _confirmDelete(deck),
+            );
+          },
+        ),
+        if (state.loadingMore)
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: LinearProgressIndicator(
+              key: ValueKey<String>('shelf_loading_more'),
+              minHeight: 2,
+            ),
+          ),
+      ],
     );
   }
 }

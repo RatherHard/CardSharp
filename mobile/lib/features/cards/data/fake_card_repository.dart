@@ -1,3 +1,4 @@
+import '../../../core/network/page.dart';
 import '../domain/card.dart';
 import '../domain/card_repository.dart';
 
@@ -20,11 +21,24 @@ class FakeCardRepository implements CardRepository {
   /// 假实现内部的自增序号，仅用于生成可读的卡片 id。
   int _seq = 0;
 
+  /// 某卡片集下的卡片数量。供假卡片集仓储展示用，接后端后由 `stats` 取代。
+  int countFor(String deckId) => _cards[deckId]?.length ?? 0;
+
   @override
-  Future<List<Card>> fetchCards(String deckId) async {
-    final List<Card> cards = List<Card>.of(_cards[deckId] ?? const <Card>[]);
-    cards.sort((Card a, Card b) => a.sortOrder.compareTo(b.sortOrder));
-    return List<Card>.unmodifiable(cards);
+  Future<PagedResult<Card>> fetchCards(String deckId, {String? cursor, int limit = 50}) async {
+    final List<Card> all = List<Card>.of(_cards[deckId] ?? const <Card>[]);
+    all.sort((Card a, Card b) => a.sortOrder.compareTo(b.sortOrder));
+
+    // 假实现用「偏移量字符串」当游标；真实游标由后端生成，对客户端同样不透明。
+    final int start = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    if (start >= all.length) {
+      return const PagedResult<Card>(items: <Card>[]);
+    }
+    final int end = (start + limit).clamp(start, all.length);
+    return PagedResult<Card>(
+      items: List<Card>.unmodifiable(all.sublist(start, end)),
+      nextCursor: end < all.length ? '$end' : null,
+    );
   }
 
   @override

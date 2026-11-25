@@ -215,8 +215,8 @@ return $default(_that.key,_that.width,_that.height,_that.alt);case _:
 }
 
 /// @nodoc
-@JsonSerializable()
 
+@JsonSerializable(fieldRename: FieldRename.snake)
 class _CardImage implements CardImage {
   const _CardImage({required this.key, this.width, this.height, this.alt});
   factory _CardImage.fromJson(Map<String, dynamic> json) => _$CardImageFromJson(json);
@@ -495,8 +495,8 @@ return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.e
 }
 
 /// @nodoc
-@JsonSerializable()
 
+@JsonSerializable(fieldRename: FieldRename.snake)
 class _CardFields implements CardFields {
   const _CardFields({required this.plaintext, required this.ciphertext,  List<CardImage> images = const <CardImage>[], this.hint, this.extra}): _images = images;
   factory _CardFields.fromJson(Map<String, dynamic> json) => _$CardFieldsFromJson(json);
@@ -792,8 +792,8 @@ return $default(_that.id,_that.deckId,_that.cardType,_that.fields,_that.sortOrde
 }
 
 /// @nodoc
-@JsonSerializable()
 
+@JsonSerializable(fieldRename: FieldRename.snake)
 class _Card implements Card {
   const _Card({required this.id, required this.deckId, this.cardType = 'memory', required this.fields, this.sortOrder = 0});
   factory _Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);

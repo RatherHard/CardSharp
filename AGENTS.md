@@ -133,6 +133,11 @@ cd mobile;  flutter test
 - **禁止**：Widget 内直接调 API；必须 `Widget → Notifier → UseCase → Repository`。
 - **命名**：文件 `snake_case.dart`，类 `PascalCase`，私有成员 `_camelCase`。
 - **常量**：`static const` 优先，避免魔法数字。
+- **序列化键名**：后端 JSON 用下划线（`deck_id`），Dart 标识符必须小驼峰。
+  新增任何带 `fromJson` / `toJson` 的模型类，**必须**在工厂构造上加
+  `@JsonSerializable(fieldRename: FieldRename.snake)`，否则接后端时字段对不上、解析直接抛错。
+  不要为此把 Dart 变量名改成下划线——`--fatal-infos` 会因 `non_constant_identifier_names` 失败。
+  已加注解的类：`Card` / `CardFields` / `CardImage` / `Deck`。
 
 ### 5.3 生成代码
 

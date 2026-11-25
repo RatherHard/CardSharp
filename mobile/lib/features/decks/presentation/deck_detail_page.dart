@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart' hide Card;
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/network/api_error.dart';
 import '../../cards/application/cards_controller.dart';
 import '../../cards/domain/card.dart';
 import '../application/decks_controller.dart';
@@ -73,9 +74,9 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<List<Deck>> decksAsync = ref.watch(decksControllerProvider);
+    final AsyncValue<DeckListState> decksAsync = ref.watch(decksControllerProvider);
     final List<Deck>? decks = switch (decksAsync) {
-      AsyncData<List<Deck>>(:final List<Deck> value) => value,
+      AsyncData<DeckListState>(:final DeckListState value) => value.decks,
       _ => null,
     };
     final Deck? deck = _findDeck(decks);
@@ -97,9 +98,9 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
           children: <Widget>[
             Expanded(
               child: switch (decksAsync) {
-                AsyncData<List<Deck>>() when deck != null => _buildBody(deck, cardsAsync, cards),
-                AsyncData<List<Deck>>() => const _CenteredHint(AppStrings.deckDetailNotFound),
-                AsyncError<List<Deck>>() => const _CenteredHint(AppStrings.deckDetailLoadFailed),
+                AsyncData<DeckListState>() when deck != null => _buildBody(deck, cardsAsync, cards),
+                AsyncData<DeckListState>() => const _CenteredHint(AppStrings.deckDetailNotFound),
+                AsyncError<DeckListState>() => const _CenteredHint(AppStrings.deckDetailLoadFailed),
                 _ => const Center(child: CircularProgressIndicator()),
               },
             ),
@@ -150,7 +151,11 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: <Widget>[
-        _Header(deck: deck, onUpdate: _updateDeck),
+        _Header(
+          deck: deck,
+          onPatch: ({String? title, String? description, String? color}) =>
+              _patchDeck(title: title, description: description, color: color),
+        ),
         const SizedBox(height: 24),
         Text(AppStrings.deckDetailCardsTitle, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
@@ -188,9 +193,13 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     return null;
   }
 
-  Future<void> _updateDeck(Deck next) async {
+  Future<void> _patchDeck({String? title, String? description, String? color}) async {
     try {
-      await ref.read(decksControllerProvider.notifier).updateDeck(next);
+      await ref
+          .read(decksControllerProvider.notifier)
+          .updateDeck(widget.deckId, title: title, description: description, color: color);
+    } on ApiError catch (error) {
+      _showMessage(error.message);
     } on Object {
       _showMessage(AppStrings.deckEditFailed);
     }
@@ -244,6 +253,8 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     }
     try {
       await ref.read(cardActionsProvider).update(edited);
+    } on ApiError catch (error) {
+      _showMessage(error.message);
     } on Object {
       _showMessage(AppStrings.cardUpdateFailed);
     }
@@ -274,6 +285,8 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     }
     try {
       await ref.read(cardActionsProvider).delete(deck.id, card.id);
+    } on ApiError catch (error) {
+      _showMessage(error.message);
     } on Object {
       _showMessage(AppStrings.cardDeleteFailed);
     }
@@ -313,6 +326,8 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     try {
       await ref.read(cardActionsProvider).deleteMany(deck.id, _selected.toList());
       _exitSelection();
+    } on ApiError catch (error) {
+      _showMessage(error.message);
     } on Object {
       _showMessage(AppStrings.cardDeleteFailed);
     }
@@ -323,10 +338,12 @@ enum _CardAction { edit, delete }
 
 /// 头部：封面 + 名称 + 简介 + 运行按钮。名称/简介/封面支持长按修改。
 class _Header extends StatelessWidget {
-  const _Header({required this.deck, required this.onUpdate});
+  const _Header({required this.deck, required this.onPatch});
 
   final Deck deck;
-  final void Function(Deck next) onUpdate;
+
+  /// 局部更新：只传要改的字段，对应后端 `PATCH /decks/{id}`。
+  final void Function({String? title, String? description, String? color}) onPatch;
 
   @override
   Widget build(BuildContext context) {
@@ -355,22 +372,22 @@ class _Header extends StatelessWidget {
                 style: theme.textTheme.titleLarge,
                 maxLines: 1,
                 allowEmpty: false,
-                onCommit: (String value) => onUpdate(deck.copyWith(title: value)),
+                onCommit: (String value) => onPatch(title: value),
               ),
-              if (deck.description.trim().isNotEmpty) ...<Widget>[
-                const SizedBox(height: 6),
-                _InlineEditable(
-                  textKey: const ValueKey<String>('deck_detail_description'),
-                  fieldKey: const ValueKey<String>('deck_edit_description_field'),
-                  value: deck.description,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  allowEmpty: true,
-                  onCommit: (String value) => onUpdate(deck.copyWith(description: value)),
+              // 简介为空时也渲染一行灰色占位，否则用户没有可长按的地方来新增简介。
+              const SizedBox(height: 6),
+              _InlineEditable(
+                textKey: const ValueKey<String>('deck_detail_description'),
+                fieldKey: const ValueKey<String>('deck_edit_description_field'),
+                value: deck.description,
+                placeholder: AppStrings.deckAddDescriptionHint,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
+                maxLines: 2,
+                allowEmpty: true,
+                onCommit: (String value) => onPatch(description: value),
+              ),
               const SizedBox(height: 10),
               Text(
                 AppStrings.deckCardCount(deck.cardCount),
@@ -397,7 +414,7 @@ class _Header extends StatelessWidget {
       builder: (BuildContext context) => _ColorSheet(current: deck.color),
     );
     if (picked != null) {
-      onUpdate(deck.copyWith(color: picked));
+      onPatch(color: picked);
     }
   }
 }
@@ -485,6 +502,7 @@ class _InlineEditable extends StatefulWidget {
     required this.style,
     required this.onCommit,
     required this.allowEmpty,
+    this.placeholder,
     this.maxLines = 1,
   });
 
@@ -494,6 +512,10 @@ class _InlineEditable extends StatefulWidget {
   final TextStyle? style;
   final ValueChanged<String> onCommit;
   final bool allowEmpty;
+
+  /// 值为空时显示的灰色提示，同时作为输入框的 hintText。
+  final String? placeholder;
+
   final int maxLines;
 
   @override
@@ -561,24 +583,28 @@ class _InlineEditableState extends State<_InlineEditable> {
         style: widget.style,
         maxLines: widget.maxLines,
         textInputAction: TextInputAction.done,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           contentPadding: EdgeInsets.zero,
           border: InputBorder.none,
+          hintText: widget.placeholder,
         ),
         onSubmitted: (_) => _commit(),
         onTapOutside: (_) => _commit(),
       );
     }
+    final bool showPlaceholder = widget.value.trim().isEmpty && widget.placeholder != null;
     return _EditableTarget(
       hint: AppStrings.hintLongPressToEdit,
       onLongPress: _startEditing,
       child: Text(
-        widget.value,
+        showPlaceholder ? widget.placeholder! : widget.value,
         key: widget.textKey,
         maxLines: widget.maxLines,
         overflow: TextOverflow.ellipsis,
-        style: widget.style,
+        style: showPlaceholder
+            ? widget.style?.copyWith(color: Theme.of(context).colorScheme.outline)
+            : widget.style,
       ),
     );
   }

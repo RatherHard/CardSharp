@@ -1,3 +1,4 @@
+import '../../../core/network/page.dart';
 import 'card.dart';
 
 /// 卡片数据源接口。
@@ -8,8 +9,11 @@ import 'card.dart';
 /// 本期（纯前端）只覆盖「读 + 改 + 删」；卡片创建属于后端制卡流水线
 /// （`docs/02` E3），客户端不提供创建入口。
 abstract interface class CardRepository {
-  /// 拉取某个卡片集下的全部卡片，按 `sortOrder` 升序返回。
-  Future<List<Card>> fetchCards(String deckId);
+  /// 拉取某一页卡片（后端 `GET /decks/{id}/cards` 是分页的，`docs/03` §6）。
+  ///
+  /// 按 `sortOrder` 升序返回；[cursor] 为 null 表示第一页，
+  /// 返回的 `nextCursor` 为 null 表示没有更多。
+  Future<PagedResult<Card>> fetchCards(String deckId, {String? cursor, int limit});
 
   /// 更新一张卡片（内容与排序都可能变）。
   Future<Card> updateCard(Card card);

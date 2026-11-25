@@ -60,13 +60,35 @@ void main() {
     expect(find.text('0 张卡片'), findsOneWidget);
   });
 
-  testWidgets('简介为空时不渲染简介行', (WidgetTester tester) async {
+  testWidgets('简介为空时显示灰色占位「添加简介」', (WidgetTester tester) async {
     await _pumpDetail(
       tester,
       deck: const Deck(id: '1', title: '空简介'),
     );
 
-    expect(find.byKey(const ValueKey<String>('deck_detail_description')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('deck_detail_description')), findsOneWidget);
+    expect(find.text('添加简介'), findsOneWidget);
+  });
+
+  testWidgets('长按占位可以新增简介', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: const Deck(id: '1', title: '空简介'),
+    );
+
+    await tester.longPress(find.byKey(const ValueKey<String>('deck_detail_description')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('deck_edit_description_field')),
+      '新写的简介',
+    );
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('新写的简介'), findsOneWidget);
+    expect(find.text('添加简介'), findsNothing);
   });
 
   testWidgets('没有卡片时显示空态', (WidgetTester tester) async {

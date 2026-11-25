@@ -9,6 +9,7 @@ part 'card.g.dart';
 /// 本期（纯前端）没有图片，字段先按契约保留，避免接后端时改模型。
 @freezed
 abstract class CardImage with _$CardImage {
+  @JsonSerializable(fieldRename: FieldRename.snake)
   const factory CardImage({required String key, int? width, int? height, String? alt}) = _CardImage;
 
   factory CardImage.fromJson(Map<String, dynamic> json) => _$CardImageFromJson(json);
@@ -24,6 +25,7 @@ abstract class CardImage with _$CardImage {
 /// 约束（`docs/03:551`）：plaintext ≤ 200 字、ciphertext ≤ 500 字，均不可为空。
 @freezed
 abstract class CardFields with _$CardFields {
+  @JsonSerializable(fieldRename: FieldRename.snake)
   const factory CardFields({
     required String plaintext,
     required String ciphertext,
@@ -39,8 +41,13 @@ abstract class CardFields with _$CardFields {
 ///
 /// 只放后端 `cards` 表里客户端真正需要的列；`content_hash` 是去重用的服务端字段，
 /// 客户端不参与计算，故不建模。
+///
+/// 序列化键名统一转成下划线（`deck_id` / `card_type` / `sort_order`），
+/// 与后端 JSON 契约一致。用注解而不是 `build.yaml`：改动就地可见，
+/// 不影响仓库其它生成任务。
 @freezed
 abstract class Card with _$Card {
+  @JsonSerializable(fieldRename: FieldRename.snake)
   const factory Card({
     required String id,
     required String deckId,

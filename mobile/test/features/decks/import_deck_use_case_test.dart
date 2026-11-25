@@ -25,7 +25,7 @@ void main() {
         ),
       );
 
-      final List<Card> stored = await cards.fetchCards(deck.id);
+      final List<Card> stored = (await cards.fetchCards(deck.id, limit: 100)).items;
       expect(stored, hasLength(2));
       expect(stored.first.fields.plaintext, '问一');
       expect(stored.first.fields.hint, '提示一');
@@ -46,13 +46,16 @@ void main() {
         ),
       );
 
-      final Deck? reloaded = (await decks.fetchDecks())
+      final Deck? reloaded = (await decks.fetchDecks(limit: 100)).items
           .where((Deck d) => d.id == deck.id)
           .firstOrNull;
       expect(reloaded, isNotNull);
-      expect(reloaded!.cardCount, 1);
-      expect(reloaded.description, '一句简介');
+      expect(reloaded!.description, '一句简介');
       expect(reloaded.color, '#5B5BD6');
+      // 导入用例不再写卡片数：统计归服务端 `stats`。
+      expect(reloaded.cardCount, 0);
+      // 但卡片确实写进去了。
+      expect((await cards.fetchCards(deck.id, limit: 100)).items, hasLength(1));
     });
   });
 }

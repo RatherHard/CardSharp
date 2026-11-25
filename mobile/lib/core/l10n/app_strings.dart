@@ -94,6 +94,9 @@ abstract final class AppStrings {
   static const String deckEditNameLabel = '名称';
   static const String deckEditDescriptionTitle = '修改简介';
   static const String deckEditDescriptionLabel = '简介';
+
+  /// 简介为空时的占位提示：让用户知道这里可以长按添加。
+  static const String deckAddDescriptionHint = '添加简介';
   static const String deckEditColorTitle = '修改封面颜色';
   static const String deckEditColorDefault = '默认';
   static const String deckEditFailed = '修改失败，请重试';

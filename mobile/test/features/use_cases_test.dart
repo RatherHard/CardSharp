@@ -1,3 +1,4 @@
+import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/auth/application/use_cases/sign_in_use_case.dart';
 import 'package:cardsharp/features/auth/application/use_cases/sign_out_use_case.dart';
 import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
@@ -52,9 +53,10 @@ void main() {
     test('FetchDecks 返回种子数据', () async {
       final useCase = FetchDecksUseCase(FakeDeckRepository());
 
-      final List<Deck> decks = await useCase();
+      final PagedResult<Deck> page = await useCase();
 
-      expect(decks, hasLength(6));
+      expect(page.items, hasLength(6));
+      expect(page.nextCursor, isNull);
     });
 
     test('CreateDeck 返回带 id 与零卡片数的新卡片集', () async {

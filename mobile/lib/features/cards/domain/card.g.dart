@@ -42,16 +42,16 @@ Map<String, dynamic> _$CardFieldsToJson(_CardFields instance) => <String, dynami
 
 _Card _$CardFromJson(Map<String, dynamic> json) => _Card(
   id: json['id'] as String,
-  deckId: json['deckId'] as String,
-  cardType: json['cardType'] as String? ?? 'memory',
+  deckId: json['deck_id'] as String,
+  cardType: json['card_type'] as String? ?? 'memory',
   fields: CardFields.fromJson(json['fields'] as Map<String, dynamic>),
-  sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+  sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
 );
 
 Map<String, dynamic> _$CardToJson(_Card instance) => <String, dynamic>{
   'id': instance.id,
-  'deckId': instance.deckId,
-  'cardType': instance.cardType,
+  'deck_id': instance.deckId,
+  'card_type': instance.cardType,
   'fields': instance.fields,
-  'sortOrder': instance.sortOrder,
+  'sort_order': instance.sortOrder,
 };

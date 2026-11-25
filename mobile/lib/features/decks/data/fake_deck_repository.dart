@@ -1,3 +1,4 @@
+import '../../../core/network/page.dart';
 import '../domain/deck.dart';
 import '../domain/deck_repository.dart';
 
@@ -18,15 +19,35 @@ const List<Deck> kSeedDecks = <Deck>[
 /// 接后端后新增 `HttpDeckRepository implements DeckRepository`，在
 /// `deckRepositoryProvider` 处替换即可；页面、Notifier、用例都不动。
 class FakeDeckRepository implements DeckRepository {
-  FakeDeckRepository([List<Deck> seed = kSeedDecks])
+  FakeDeckRepository([List<Deck> seed = kSeedDecks, this.cardCounter])
     : _decks = List<Deck>.of(seed),
       _nextId = _computeNextId(seed);
 
   final List<Deck> _decks;
   int _nextId;
 
+  /// 统计卡片数的回调，仅假实现使用：真实数量应由后端 `stats` 提供。
+  /// 由 `deckRepositoryProvider` 注入，避免假仓储自己跨 feature 读卡片数据。
+  final int Function(String deckId)? cardCounter;
+
   @override
-  Future<List<Deck>> fetchDecks() async => List<Deck>.unmodifiable(_decks);
+  Future<PagedResult<Deck>> fetchDecks({String? cursor, int limit = 20}) async {
+    final int Function(String)? counter = cardCounter;
+    final List<Deck> all = counter == null
+        ? List<Deck>.of(_decks)
+        : <Deck>[for (final Deck deck in _decks) deck.copyWith(cardCount: counter(deck.id))];
+
+    // 假实现用「偏移量字符串」当游标。真实游标由后端生成，对客户端同样不透明。
+    final int start = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    if (start >= all.length) {
+      return const PagedResult<Deck>(items: <Deck>[]);
+    }
+    final int end = (start + limit).clamp(start, all.length);
+    return PagedResult<Deck>(
+      items: List<Deck>.unmodifiable(all.sublist(start, end)),
+      nextCursor: end < all.length ? '$end' : null,
+    );
+  }
 
   @override
   Future<Deck> createDeck({required String title}) async {
@@ -41,13 +62,20 @@ class FakeDeckRepository implements DeckRepository {
   }
 
   @override
-  Future<Deck> updateDeck(Deck deck) async {
-    final int index = _decks.indexWhere((Deck item) => item.id == deck.id);
+  Future<Deck> updateDeck(String id, {String? title, String? description, String? color}) async {
+    final int index = _decks.indexWhere((Deck item) => item.id == id);
     if (index < 0) {
-      throw StateError('卡片集不存在：${deck.id}');
+      throw StateError('卡片集不存在：$id');
     }
-    _decks[index] = deck;
-    return deck;
+    // 局部更新语义：只改传进来的字段，其余字段保持原值。
+    final Deck current = _decks[index];
+    final Deck updated = current.copyWith(
+      title: title ?? current.title,
+      description: description ?? current.description,
+      color: color ?? current.color,
+    );
+    _decks[index] = updated;
+    return updated;
   }
 
   @override

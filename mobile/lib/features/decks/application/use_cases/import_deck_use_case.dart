@@ -19,14 +19,12 @@ final class ImportDeckUseCase {
 
   Future<Deck> call(DeckImport data) async {
     final Deck created = await _decks.createDeck(title: data.title);
+    // 只改需要改的字段；卡片数不在这里写——统计归服务端 `stats`，
+    // 假实现由 `FakeDeckRepository.cardCounter` 在读取时补上。
     final Deck updated = await _decks.updateDeck(
-      created.copyWith(
-        description: data.description,
-        color: data.color,
-        // 假仓储没有服务端统计，这里先用导入数量填上，避免列表显示 0。
-        // 接后端后 cardCount 一律以服务端 stats 为准，这一行应删除。
-        cardCount: data.cards.length,
-      ),
+      created.id,
+      description: data.description,
+      color: data.color,
     );
     await _cards.addCards(updated.id, <CardFields>[
       for (final ImportedDeckCard card in data.cards)

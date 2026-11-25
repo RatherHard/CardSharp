@@ -1,3 +1,4 @@
+import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,10 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('FakeDeckRepository', () {
     test('默认返回 6 个种子卡片集，卡片数都是 0', () async {
-      final decks = await FakeDeckRepository().fetchDecks();
+      final PagedResult<Deck> page = await FakeDeckRepository().fetchDecks(limit: 100);
 
-      expect(decks, hasLength(kSeedDecks.length));
-      expect(decks.map((Deck d) => d.title).toList(), <String>[
+      expect(page.items, hasLength(kSeedDecks.length));
+      expect(page.items.map((Deck d) => d.title).toList(), <String>[
         '卡片集1',
         '卡片集2',
         '卡片集3',
@@ -16,14 +17,46 @@ void main() {
         '卡片集5',
         '卡片集6',
       ]);
-      expect(decks.every((Deck d) => d.cardCount == 0), isTrue);
+      expect(page.items.every((Deck d) => d.cardCount == 0), isTrue);
+      expect(page.nextCursor, isNull);
+    });
+
+    test('分页：按 limit 切分，游标可续取下一页', () async {
+      final repository = FakeDeckRepository();
+
+      final PagedResult<Deck> first = await repository.fetchDecks(limit: 4);
+      expect(first.items, hasLength(4));
+      expect(first.nextCursor, isNotNull);
+
+      final PagedResult<Deck> second = await repository.fetchDecks(
+        cursor: first.nextCursor,
+        limit: 4,
+      );
+      expect(second.items, hasLength(2));
+      expect(second.nextCursor, isNull);
+
+      final List<String> ids = <String>[
+        ...first.items.map((Deck d) => d.id),
+        ...second.items.map((Deck d) => d.id),
+      ];
+      expect(ids.toSet().length, kSeedDecks.length);
+    });
+
+    test('游标越界时返回空页，不抛异常', () async {
+      final PagedResult<Deck> page = await FakeDeckRepository().fetchDecks(
+        cursor: '999',
+        limit: 10,
+      );
+
+      expect(page.items, isEmpty);
+      expect(page.nextCursor, isNull);
     });
 
     test('返回值为只读副本，外部修改不能影响内部状态', () async {
       final repository = FakeDeckRepository();
-      final decks = await repository.fetchDecks();
+      final PagedResult<Deck> page = await repository.fetchDecks(limit: 100);
 
-      expect(() => decks.add(const Deck(id: 'x', title: 'x')), throwsUnsupportedError);
+      expect(() => page.items.add(const Deck(id: 'x', title: 'x')), throwsUnsupportedError);
     });
 
     test('新建：名称去空格、卡片数从 0 开始、id 递增', () async {
@@ -35,14 +68,14 @@ void main() {
       expect(first.title, 'TestDeck');
       expect(first.cardCount, 0);
       expect(second.id, isNot(first.id));
-      expect((await repository.fetchDecks()).length, kSeedDecks.length + 2);
+      expect((await repository.fetchDecks(limit: 100)).items.length, kSeedDecks.length + 2);
     });
 
     test('新建：空名称抛 ArgumentError 且不写入', () async {
       final repository = FakeDeckRepository();
 
       await expectLater(repository.createDeck(title: '   '), throwsArgumentError);
-      expect((await repository.fetchDecks()).length, kSeedDecks.length);
+      expect((await repository.fetchDecks(limit: 100)).items.length, kSeedDecks.length);
     });
 
     test('id 取现有最大值 +1，删除后再建不会撞号', () async {
@@ -52,7 +85,7 @@ void main() {
       final created = await repository.createDeck(title: 'after-delete');
 
       expect(created.id, '7');
-      final ids = (await repository.fetchDecks()).map((Deck d) => d.id).toList();
+      final ids = (await repository.fetchDecks(limit: 100)).items.map((Deck d) => d.id).toList();
       expect(ids.toSet().length, ids.length);
     });
 
@@ -80,7 +113,10 @@ void main() {
 
       await repository.deleteDeck('2');
 
-      expect((await repository.fetchDecks()).map((Deck d) => d.id), isNot(contains('2')));
+      expect(
+        (await repository.fetchDecks(limit: 100)).items.map((Deck d) => d.id),
+        isNot(contains('2')),
+      );
     });
 
     test('删除不存在的卡片集抛 StateError', () async {
@@ -95,7 +131,21 @@ void main() {
 
       await a.createDeck(title: 'only-in-a');
 
-      expect((await b.fetchDecks()).length, kSeedDecks.length);
+      expect((await b.fetchDecks(limit: 100)).items.length, kSeedDecks.length);
+    });
+
+    test('局部更新只改传入的字段', () async {
+      final repository = FakeDeckRepository();
+
+      final Deck updated = await repository.updateDeck('1', title: '改名了');
+
+      expect(updated.title, '改名了');
+      expect(updated.description, '');
+      expect(updated.color, '');
+
+      final Deck reloaded = (await repository.fetchDecks(limit: 100)).items
+          .firstWhere((Deck d) => d.id == '1');
+      expect(reloaded.title, '改名了');
     });
   });
 }
