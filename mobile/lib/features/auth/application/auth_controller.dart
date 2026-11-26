@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/repository_providers.dart';
 import '../domain/auth_repository.dart';
@@ -8,7 +8,7 @@ import 'use_cases/sign_in_use_case.dart';
 import 'use_cases/sign_out_use_case.dart';
 
 /// 用例注入点。状态层只依赖用例与 domain 接口，不出现任何 data 层实现
-/// （`AGENTS.md` §5.2 分层约定；仓储端口声明在 `core/di/repository_providers.dart`）。
+/// （`AGENTS.md` §2.1 分层约定；仓储端口声明在 `core/di/repository_providers.dart`）。
 final getCurrentUserUseCaseProvider = Provider<GetCurrentUserUseCase>(
   (Ref ref) => GetCurrentUserUseCase(ref.watch(authRepositoryProvider)),
 );

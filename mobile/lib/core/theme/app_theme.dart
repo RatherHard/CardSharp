@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+﻿import 'package:material_ui/material_ui.dart';
 
 /// 全局主题。
 ///
@@ -6,14 +6,14 @@ import 'package:material_ui/material_ui.dart';
 /// 正文行高不低于 1.5，避免长时间阅读疲劳。
 abstract final class AppTheme {
   /// 品牌主色（靛蓝），用于强调与进度指示。
-  static const Color seed = Color(0xFF4F46E5);
+  static const Color kSeedColor = Color(0xFF4F46E5);
 
   static ThemeData get light => _build(Brightness.light);
 
   static ThemeData get dark => _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+    final scheme = ColorScheme.fromSeed(seedColor: kSeedColor, brightness: brightness);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,

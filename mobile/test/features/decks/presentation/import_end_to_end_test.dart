@@ -3,12 +3,13 @@ import 'package:cardsharp/app.dart';
 import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/development_account.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
-import 'package:cardsharp/features/decks/application/import_file_picker.dart';
+import 'package:cardsharp/core/di/service_providers.dart';
+import 'package:cardsharp/features/decks/domain/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -16,9 +17,16 @@ const String _sampleJson = '''
 {
   "title": "奶蛙家族图鉴",
   "description": "测试简介",
+  "card_type": "memory",
   "cards": [
-    {"plaintext": "奶蛙最明显的特征是什么？", "ciphertext": "绿眼睛和浅色肚皮"},
-    {"plaintext": "奶蛋是什么形状？", "ciphertext": "圆润的黄色蛋形"}
+    {
+      "sort_order": 1,
+      "fields": {"plaintext": "奶蛙最明显的特征是什么？", "ciphertext": "绿眼睛和浅色肚皮"}
+    },
+    {
+      "sort_order": 2,
+      "fields": {"plaintext": "奶蛋是什么形状？", "ciphertext": "圆润的黄色蛋形"}
+    }
   ]
 }
 ''';

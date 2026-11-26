@@ -108,6 +108,7 @@ flutter:
   # 导入链路与用户自选文件完全一致，只是数据来源是应用内置资源。
   assets:
     - assets/examples/
+    - assets/examples/cards/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

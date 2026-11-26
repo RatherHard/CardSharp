@@ -96,23 +96,23 @@ void main() {
     expect(find.byKey(const ValueKey<String>('deck_detail_no_cards')), findsOneWidget);
   });
 
-  testWidgets('有卡片时按顺序显示序号与明文，暗文只显示占位', (WidgetTester tester) async {
+  testWidgets('有卡片时按顺序显示序号与卡片名，暗文不显示', (WidgetTester tester) async {
     await _pumpDetail(
       tester,
       deck: deckWithDescription,
-      cards: <Card>[
-        _card('c1', '线粒体的主要功能是什么？', '产生 ATP', 0),
-        _card('c2', '细胞膜的基本骨架是什么？', '磷脂双分子层', 1),
-      ],
+      cards: <Card>[_card('c1', '奶蛙', '绿眼睛和浅色的肚皮', 0), _card('c2', '奶蛋', '圆润的黄色蛋形角色', 1)],
     );
 
-    expect(find.text('线粒体的主要功能是什么？'), findsOneWidget);
-    expect(find.text('细胞膜的基本骨架是什么？'), findsOneWidget);
+    // 每张卡是一个独立的圆角长条，序号和卡片名都在条内。
+    expect(find.byKey(const ValueKey<String>('deck_card_bar_c1')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('deck_card_bar_c2')), findsOneWidget);
+    expect(find.text('奶蛙'), findsOneWidget);
+    expect(find.text('奶蛋'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
-    // 两张卡片各一个占位，且不泄露暗文内容。
-    expect(find.text('？？'), findsNWidgets(2));
-    expect(find.text('产生 ATP'), findsNothing);
+    // 列表不展示暗文内容，避免剧透答案。
+    expect(find.text('绿眼睛和浅色的肚皮'), findsNothing);
+    expect(find.text('圆润的黄色蛋形角色'), findsNothing);
   });
 
   testWidgets('运行按钮存在', (WidgetTester tester) async {
@@ -201,5 +201,25 @@ void main() {
       find.byKey(const ValueKey<String>('multi_select_enter')),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('窄屏 360dp + 长标题：右上角「导入封面」「多选」不撑破 AppBar', (WidgetTester tester) async {
+    // 真机宽度按 360dp 算是本项目的下限；AppBar 里塞两个文字按钮后最容易在这里溢出。
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await _pumpDetail(
+      tester,
+      deck: const Deck(id: '1', title: '一个很长很长的卡片集标题用来挤压导航栏'),
+    );
+
+    expect(find.byKey(const ValueKey<String>('deck_cover_import')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('multi_select_enter')), findsOneWidget);
+    // 溢出会以 FlutterError 形式挂在测试上，这里显式取出并断言没有。
+    expect(tester.takeException(), isNull);
   });
 }

@@ -295,7 +295,7 @@ as String?,
 /// @nodoc
 mixin _$CardFields {
 
- String get plaintext; String get ciphertext; List<CardImage> get images; String? get hint; String? get extra;
+ String get plaintext; String get ciphertext; List<CardImage> get images; String? get hint; String? get extra; String? get question;
 /// Create a copy of CardFields
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -309,20 +309,20 @@ $CardFieldsCopyWith<CardFields> get copyWith => _$CardFieldsCopyWithImpl<CardFie
 @override
 bool operator ==(Object other) {
   final _this = this as CardFields;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CardFields&&(identical(other.plaintext, _this.plaintext) || other.plaintext == _this.plaintext)&&(identical(other.ciphertext, _this.ciphertext) || other.ciphertext == _this.ciphertext)&&const DeepCollectionEquality().equals(other.images, _this.images)&&(identical(other.hint, _this.hint) || other.hint == _this.hint)&&(identical(other.extra, _this.extra) || other.extra == _this.extra));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CardFields&&(identical(other.plaintext, _this.plaintext) || other.plaintext == _this.plaintext)&&(identical(other.ciphertext, _this.ciphertext) || other.ciphertext == _this.ciphertext)&&const DeepCollectionEquality().equals(other.images, _this.images)&&(identical(other.hint, _this.hint) || other.hint == _this.hint)&&(identical(other.extra, _this.extra) || other.extra == _this.extra)&&(identical(other.question, _this.question) || other.question == _this.question));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as CardFields;
-  return Object.hash(runtimeType,_this.plaintext,_this.ciphertext,const DeepCollectionEquality().hash(_this.images),_this.hint,_this.extra);
+  return Object.hash(runtimeType,_this.plaintext,_this.ciphertext,const DeepCollectionEquality().hash(_this.images),_this.hint,_this.extra,_this.question);
 }
 
 @override
 String toString() {
   final _this = this as CardFields;
-  return 'CardFields(plaintext: ${_this.plaintext}, ciphertext: ${_this.ciphertext}, images: ${_this.images}, hint: ${_this.hint}, extra: ${_this.extra})';
+  return 'CardFields(plaintext: ${_this.plaintext}, ciphertext: ${_this.ciphertext}, images: ${_this.images}, hint: ${_this.hint}, extra: ${_this.extra}, question: ${_this.question})';
 }
 
 
@@ -333,7 +333,7 @@ abstract mixin class $CardFieldsCopyWith<$Res>  {
   factory $CardFieldsCopyWith(CardFields value, $Res Function(CardFields) _then) = _$CardFieldsCopyWithImpl;
 @useResult
 $Res call({
- String plaintext, String ciphertext, List<CardImage> images, String? hint, String? extra
+ String plaintext, String ciphertext, List<CardImage> images, String? hint, String? extra, String? question
 });
 
 
@@ -350,13 +350,14 @@ class _$CardFieldsCopyWithImpl<$Res>
 
 /// Create a copy of CardFields
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? plaintext = null,Object? ciphertext = null,Object? images = null,Object? hint = freezed,Object? extra = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? plaintext = null,Object? ciphertext = null,Object? images = null,Object? hint = freezed,Object? extra = freezed,Object? question = freezed,}) {
   return _then(CardFields(
 plaintext: null == plaintext ? _self.plaintext : plaintext // ignore: cast_nullable_to_non_nullable
 as String,ciphertext: null == ciphertext ? _self.ciphertext : ciphertext // ignore: cast_nullable_to_non_nullable
 as String,images: null == images ? _self.images : images // ignore: cast_nullable_to_non_nullable
 as List<CardImage>,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,extra: freezed == extra ? _self.extra : extra // ignore: cast_nullable_to_non_nullable
+as String?,question: freezed == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }
@@ -442,10 +443,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra,  String? question)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CardFields() when $default != null:
-return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra);case _:
+return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra,_that.question);case _:
   return orElse();
 
 }
@@ -463,10 +464,10 @@ return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.e
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra,  String? question)  $default,) {final _that = this;
 switch (_that) {
 case _CardFields():
-return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra);case _:
+return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra,_that.question);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -483,10 +484,10 @@ return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.e
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String plaintext,  String ciphertext,  List<CardImage> images,  String? hint,  String? extra,  String? question)?  $default,) {final _that = this;
 switch (_that) {
 case _CardFields() when $default != null:
-return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra);case _:
+return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.extra,_that.question);case _:
   return null;
 
 }
@@ -498,7 +499,7 @@ return $default(_that.plaintext,_that.ciphertext,_that.images,_that.hint,_that.e
 
 @JsonSerializable(fieldRename: FieldRename.snake)
 class _CardFields implements CardFields {
-  const _CardFields({required this.plaintext, required this.ciphertext,  List<CardImage> images = const <CardImage>[], this.hint, this.extra}): _images = images;
+  const _CardFields({required this.plaintext, required this.ciphertext,  List<CardImage> images = const <CardImage>[], this.hint, this.extra, this.question}): _images = images;
   factory _CardFields.fromJson(Map<String, dynamic> json) => _$CardFieldsFromJson(json);
 
 @override final  String plaintext;
@@ -512,6 +513,7 @@ class _CardFields implements CardFields {
 
 @override final  String? hint;
 @override final  String? extra;
+@override final  String? question;
 
 /// Create a copy of CardFields
 /// with the given fields replaced by the non-null parameter values.
@@ -526,18 +528,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CardFields&&(identical(other.plaintext, plaintext) || other.plaintext == plaintext)&&(identical(other.ciphertext, ciphertext) || other.ciphertext == ciphertext)&&const DeepCollectionEquality().equals(other.images, _images)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.extra, extra) || other.extra == extra));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CardFields&&(identical(other.plaintext, plaintext) || other.plaintext == plaintext)&&(identical(other.ciphertext, ciphertext) || other.ciphertext == ciphertext)&&const DeepCollectionEquality().equals(other.images, _images)&&(identical(other.hint, hint) || other.hint == hint)&&(identical(other.extra, extra) || other.extra == extra)&&(identical(other.question, question) || other.question == question));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,plaintext,ciphertext,const DeepCollectionEquality().hash(_images),hint,extra);
+    return Object.hash(runtimeType,plaintext,ciphertext,const DeepCollectionEquality().hash(_images),hint,extra,question);
 }
 
 @override
 String toString() {
-    return 'CardFields(plaintext: $plaintext, ciphertext: $ciphertext, images: $images, hint: $hint, extra: $extra)';
+    return 'CardFields(plaintext: $plaintext, ciphertext: $ciphertext, images: $images, hint: $hint, extra: $extra, question: $question)';
 }
 
 
@@ -548,7 +550,7 @@ abstract mixin class _$CardFieldsCopyWith<$Res> implements $CardFieldsCopyWith<$
   factory _$CardFieldsCopyWith(_CardFields value, $Res Function(_CardFields) _then) = __$CardFieldsCopyWithImpl;
 @override @useResult
 $Res call({
- String plaintext, String ciphertext, List<CardImage> images, String? hint, String? extra
+ String plaintext, String ciphertext, List<CardImage> images, String? hint, String? extra, String? question
 });
 
 
@@ -565,13 +567,14 @@ class __$CardFieldsCopyWithImpl<$Res>
 
 /// Create a copy of CardFields
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? plaintext = null,Object? ciphertext = null,Object? images = null,Object? hint = freezed,Object? extra = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? plaintext = null,Object? ciphertext = null,Object? images = null,Object? hint = freezed,Object? extra = freezed,Object? question = freezed,}) {
   return _then(_CardFields(
 plaintext: null == plaintext ? _self.plaintext : plaintext // ignore: cast_nullable_to_non_nullable
 as String,ciphertext: null == ciphertext ? _self.ciphertext : ciphertext // ignore: cast_nullable_to_non_nullable
 as String,images: null == images ? _self._images : images // ignore: cast_nullable_to_non_nullable
 as List<CardImage>,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,extra: freezed == extra ? _self.extra : extra // ignore: cast_nullable_to_non_nullable
+as String?,question: freezed == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }

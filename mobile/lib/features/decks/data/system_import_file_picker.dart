@@ -1,13 +1,6 @@
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// 读取用户选择的 JSON 文本。
-///
-/// 抽成接口是为了：1) 测试时注入假实现；2) 将来换别的读取方式只改实现。
-abstract interface class ImportFilePicker {
-  /// 返回文件内容；用户取消选择或读取失败时返回 null。
-  Future<String?> pickJsonText();
-}
+import '../domain/import_file_picker.dart';
 
 /// 系统文件选择器实现（Android 走 Storage Access Framework）。
 ///
@@ -26,7 +19,3 @@ class SystemImportFilePicker implements ImportFilePicker {
     return file.readAsString();
   }
 }
-
-final Provider<ImportFilePicker> importFilePickerProvider = Provider<ImportFilePicker>(
-  (Ref ref) => const SystemImportFilePicker(),
-);

@@ -1,7 +1,8 @@
 import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
-import 'package:cardsharp/features/decks/application/import_file_picker.dart';
+import 'package:cardsharp/core/di/service_providers.dart';
+import 'package:cardsharp/features/decks/domain/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_repository.dart';
@@ -111,7 +112,7 @@ void main() {
     await _pumpShelf(
       tester,
       picker: const _FakePicker(
-        '{"title":"导入的卡片集","cards":[{"plaintext":"问一","ciphertext":"答一"}]}',
+        '{"title":"导入的卡片集","cards":[{"fields":{"plaintext":"问一","ciphertext":"答一"}}]}',
       ),
     );
 
@@ -185,7 +186,11 @@ class _BrokenRepository implements DeckRepository {
       throw StateError('boom');
 
   @override
-  Future<Deck> createDeck({required String title}) async => throw StateError('boom');
+  Future<Deck> createDeck({
+    required String title,
+    String cardType = 'memory',
+    Map<String, dynamic> config = const <String, dynamic>{},
+  }) async => throw StateError('boom');
 
   @override
   Future<Deck> updateDeck(String id, {String? title, String? description, String? color}) async =>

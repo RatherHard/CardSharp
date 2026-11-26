@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ImportDeckUseCase', () {
-    test('导入后能用返回的 deck.id 读回全部卡片', () async {
+    test('导入后能用返回的 deck.id 读回全部卡片（含 images 与 hint/extra）', () async {
       final FakeDeckRepository decks = FakeDeckRepository();
       final FakeCardRepository cards = FakeCardRepository();
       final ImportDeckUseCase useCase = ImportDeckUseCase(decks, cards);
@@ -18,9 +18,14 @@ void main() {
           title: '导入的卡片集',
           description: '简介',
           color: '#10B981',
-          cards: <ImportedDeckCard>[
-            ImportedDeckCard(plaintext: '问一', ciphertext: '答一', hint: '提示一'),
-            ImportedDeckCard(plaintext: '问二', ciphertext: '答二'),
+          cards: <CardFields>[
+            CardFields(
+              plaintext: '问一',
+              ciphertext: '答一',
+              images: <CardImage>[CardImage(key: 'img/1.png', width: 800, height: 600)],
+              hint: '提示一',
+            ),
+            CardFields(plaintext: '问二', ciphertext: '答二'),
           ],
         ),
       );
@@ -29,10 +34,11 @@ void main() {
       expect(stored, hasLength(2));
       expect(stored.first.fields.plaintext, '问一');
       expect(stored.first.fields.hint, '提示一');
+      expect(stored.first.fields.images.single.key, 'img/1.png');
       expect(stored.last.fields.plaintext, '问二');
     });
 
-    test('导入后卡片集的卡片数、简介、颜色都写入了', () async {
+    test('导入后卡片集的 card_type / config / 简介 / 颜色都写入了', () async {
       final FakeDeckRepository decks = FakeDeckRepository();
       final FakeCardRepository cards = FakeCardRepository();
       final ImportDeckUseCase useCase = ImportDeckUseCase(decks, cards);
@@ -42,7 +48,10 @@ void main() {
           title: '统计检查',
           description: '一句简介',
           color: '#5B5BD6',
-          cards: <ImportedDeckCard>[ImportedDeckCard(plaintext: 'a', ciphertext: 'b')],
+          config: <String, dynamic>{
+            'runner': <String, dynamic>{'scheduler': 'fsrs'},
+          },
+          cards: <CardFields>[CardFields(plaintext: 'a', ciphertext: 'b')],
         ),
       );
 
@@ -52,6 +61,8 @@ void main() {
       expect(reloaded, isNotNull);
       expect(reloaded!.description, '一句简介');
       expect(reloaded.color, '#5B5BD6');
+      expect(reloaded.cardType, kMemoryCardType);
+      expect(reloaded.config, containsPair('runner', isNotNull));
       // 导入用例不再写卡片数：统计归服务端 `stats`。
       expect(reloaded.cardCount, 0);
       // 但卡片确实写进去了。

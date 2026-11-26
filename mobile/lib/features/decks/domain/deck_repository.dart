@@ -36,8 +36,14 @@ abstract interface class DeckRepository {
 
   /// 新建卡片集。`id` 与统计字段由实现方（将来是后端）分配。
   ///
+  /// [cardType] 与 [config] 对应后端 `POST /decks` 里标题以外的可写字段
+  /// （`docs/03` §4.2、§4.3）：导入时由文件提供，手工新建时用默认值。
   /// 标题为空时抛 [DeckException]（failure = [DeckFailure.titleRequired]）。
-  Future<Deck> createDeck({required String title});
+  Future<Deck> createDeck({
+    required String title,
+    String cardType = 'memory',
+    Map<String, dynamic> config = const <String, dynamic>{},
+  });
 
   /// 局部更新卡片集（对应后端 `PATCH /decks/{id}`，`docs/03` §6）。
   ///

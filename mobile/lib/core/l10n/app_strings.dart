@@ -12,6 +12,8 @@
 /// 约定：
 /// - 界面文案是常量；带变量的文案用静态方法；
 /// - 假数据（`kSeedDecks` 的「卡片集1..6」）属于数据，不放在这里；
+///   唯一例外是内置示例卡片集的标题：它同时是展示层「演示封面」的匹配键，
+///   放这里便于和 `assets/examples/deck-sample.json` 一起校验（见 `sampleDeckTitle`）；
 /// - 异常消息（会展示给用户的那几句）也放这里，避免数据层与展示层各写一套。
 abstract final class AppStrings {
   // ---------------------------------------------------------------- 通用动作
@@ -74,15 +76,58 @@ abstract final class AppStrings {
   static const String deckDetailRun = '运行';
   static const String deckDetailNoCards = '还没有卡片';
   static const String deckDetailNoCardsHint = '这里会显示卡片集里的卡片';
-  static const String deckDetailColumnIndex = '序号';
-  static const String deckDetailColumnPlaintext = '卡片明文';
-  static const String deckDetailColumnCiphertext = '暗文';
-
-  /// 列表里不展示暗文内容，只给一个占位，避免剧透答案。
-  static const String deckCiphertextHidden = '？？';
   static const String deckDetailNotFound = '卡片集不存在';
   static const String deckDetailLoadFailed = '卡片加载失败';
-  static const String cardPageTitle = '卡片页面';
+  static const String cardPageTitle = '卡片';
+
+  // ---------------------------------------------------------------- 卡片页（浏览模式）
+  static const String cardImageEmpty = '还没有配图';
+  static const String cardImageEmptyHint = '接入后端后可上传和查看配图';
+  static const String cardDefinitionLabel = '定义';
+  static const String cardHintLabel = '提示';
+  static const String cardExtraLabel = '备注';
+
+  /// 卡片页的辅助信息区（提示 + 备注），默认折叠，点标题展开。
+  static const String cardTipsTitle = 'Tips';
+  static const String cardNotFound = '这张卡片不存在';
+  static const String cardLoadFailed = '卡片加载失败';
+  static const String cardRetry = '重试';
+
+  /// 卡片页顶部星标：接后端后是「收藏/标记」，现在只做本地切换。
+  static const String cardFavoriteTooltip = '标记卡片';
+  static const String cardFavoriteHint = '标记功能接入后端后可用';
+
+  /// Agent 区占位（AI 分析 / 解题），接后端后接 SSE 流式回答（docs/03 §7.5 InlineChatSection）。
+  static const String cardAgentTitle = 'Agent 分析 / 解题';
+  static const String cardAgentHint = '接入后端后，这里显示 AI 讲解与追问';
+
+  /// 卡片页底部输入区占位（选项 / 回答 / 提问）。
+  static const String cardInputHint = '选项 / 回答输入 / 提问';
+
+  /// 卡片页底部「翻页」：翻到卡片集里的下一张。
+  static const String cardFlipLabel = '翻页';
+  static const String cardFlipLastHint = '已是最后一张';
+
+  // ---------------------------------------------------------------- 复习（运行）
+  static const String reviewTitle = '复习';
+  static const String reviewQuestionLabel = '问题';
+  static const String reviewAnswerLabel = '答案';
+  static const String reviewShowAnswer = '查看';
+  static const String reviewOpenCard = '查看本卡片';
+
+  /// 卡片正文翻出来后，底部的「收起」：翻回答案面。
+  static const String reviewHideCard = '收起';
+  static const String reviewNext = '下一个';
+  static const String reviewFinish = '完成';
+  static const String reviewDoneTitle = '这一轮看完了';
+  static const String reviewRestart = '再看一遍';
+  static const String reviewEmpty = '这个卡片集还没有卡片';
+
+  /// 复习页顶部进度文案，如「第 3 / 8 张」。
+  static String reviewProgressText(int current, int total) => '第 $current / $total 张';
+
+  /// 复习完成页的统计文案。
+  static String reviewDoneSummary(int total) => '共看完 $total 张卡片';
 
   // ---------------------------------------------------------------- 编辑与多选
   static const String actionEdit = '编辑';
@@ -138,7 +183,9 @@ abstract final class AppStrings {
   static const String importErrorNotAnObject = '文件内容不是一份卡片集';
   static const String importErrorMissingTitle = '缺少卡片集名称（title）';
   static const String importErrorMissingCards = '文件里没有任何卡片';
-  static const String importErrorInvalidCard = '有卡片缺少明文或暗文，或超出字数限制';
+  static const String importErrorInvalidDeck = '卡片集字段格式不对（description / color / config）';
+  static const String importErrorInvalidCard = '有卡片的 fields 格式不对：缺明文/暗文、超长或图片字段不合法';
+  static const String importErrorUnsupportedCardType = '暂时只支持记忆卡（card_type 必须是 memory）';
 
   static String importSucceeded(String title) => '已导入「$title」';
 
@@ -167,4 +214,26 @@ abstract final class AppStrings {
   /// 版本号：与 `mobile/pubspec.yaml` 的 `version` 保持一致，改版本时两处一起改。
   static const String appVersion = '1.0.0+1';
   static const String settingsVersionLabel = '版本';
+
+  // ---------------------------------------------------------------- 卡片集封面
+  static const String deckCoverSheetTitle = '封面';
+
+  /// 卡片集详情页右上角「导入封面」按钮：只导入封面，不涉及卡片配图。
+  static const String deckCoverImportAction = '导入封面';
+  static const String deckCoverPickImage = '选择本地图片';
+  static const String deckCoverChangeColor = '更换封面色';
+  static const String deckCoverRemoveImage = '移除封面图';
+  static const String deckCoverUpdateFailed = '封面更新失败，请重试';
+
+  // ---------------------------------------------------------------- 系统文件选择器
+  /// 系统文件选择器里「图片」这一组的中文标签（Android SAF 会原样显示）。
+  static const String imageFileTypeGroupLabel = '图片';
+
+  // ---------------------------------------------------------------- 内置示例卡片集
+  /// 内置示例卡片集的标题。
+  ///
+  /// 必须与 `assets/examples/deck-sample.json` 的 `title` 保持一致：
+  /// - 导入该示例后，书架按这个标题给它配演示封面（见 `demo_deck_covers.dart`）；
+  /// - 有单测 `sample_deck_test.dart` 守着这两处不许漂移。
+  static const String sampleDeckTitle = '奶蛙家族图鉴';
 }

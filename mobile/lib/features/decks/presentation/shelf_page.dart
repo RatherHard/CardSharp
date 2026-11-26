@@ -2,13 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../application/bundled_deck_loader.dart';
 import '../application/decks_controller.dart';
-import '../application/import_file_picker.dart';
+import '../application/deck_list_state.dart';
 import '../domain/deck.dart';
 import '../domain/deck_import.dart';
 import '../domain/deck_repository.dart';
 import 'widgets/deck_cover.dart';
+import '../../../core/di/service_providers.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/network/api_error.dart';
 
@@ -160,7 +160,9 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     DeckImportError.notAnObject => AppStrings.importErrorNotAnObject,
     DeckImportError.missingTitle => AppStrings.importErrorMissingTitle,
     DeckImportError.missingCards => AppStrings.importErrorMissingCards,
+    DeckImportError.invalidDeck => AppStrings.importErrorInvalidDeck,
     DeckImportError.invalidCard => AppStrings.importErrorInvalidCard,
+    DeckImportError.unsupportedCardType => AppStrings.importErrorUnsupportedCardType,
   };
 
   Future<void> _confirmDelete(Deck deck) async {

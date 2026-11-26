@@ -1,9 +1,9 @@
-import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
+﻿import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/development_account.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 /// 登录态持久化：假登录也把「谁登录了」写进本地存储，
 /// 这样冷启动不必重新输入账号（password 从不落盘）。

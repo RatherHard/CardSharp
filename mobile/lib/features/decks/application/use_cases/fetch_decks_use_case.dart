@@ -1,4 +1,4 @@
-import '../../../../core/network/page.dart';
+﻿import '../../../../core/network/page.dart';
 import '../../domain/deck.dart';
 import '../../domain/deck_repository.dart';
 
@@ -9,10 +9,10 @@ final class FetchDecksUseCase {
   const FetchDecksUseCase(this._repository);
 
   /// 默认每页数量。与后端约定一致（`docs/03` §6 的 `limit=20`）。
-  static const int pageSize = 20;
+  static const int kPageSize = 20;
 
   final DeckRepository _repository;
 
   Future<PagedResult<Deck>> call({String? cursor}) =>
-      _repository.fetchDecks(cursor: cursor, limit: pageSize);
+      _repository.fetchDecks(cursor: cursor, limit: kPageSize);
 }

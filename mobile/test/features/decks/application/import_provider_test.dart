@@ -31,10 +31,10 @@ void main() {
             title: '容器测试',
             description: '简介',
             color: '#10B981',
-            cards: <ImportedDeckCard>[
-              ImportedDeckCard(plaintext: '问一', ciphertext: '答一'),
-              ImportedDeckCard(plaintext: '问二', ciphertext: '答二'),
-              ImportedDeckCard(plaintext: '问三', ciphertext: '答三'),
+            cards: <CardFields>[
+              CardFields(plaintext: '问一', ciphertext: '答一'),
+              CardFields(plaintext: '问二', ciphertext: '答二'),
+              CardFields(plaintext: '问三', ciphertext: '答三'),
             ],
           ),
         );

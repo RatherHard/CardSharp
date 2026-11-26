@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/domain/auth_repository.dart';
 import '../../features/cards/domain/card_repository.dart';
@@ -6,7 +6,7 @@ import '../../features/decks/domain/deck_repository.dart';
 
 /// 仓储端口（domain 接口）的唯一声明处。
 ///
-/// 分层约定（`AGENTS.md` §5.2：Widget → Notifier → UseCase → Repository）：
+/// 分层约定（`AGENTS.md` §2.1：Widget → Notifier → UseCase → Repository）：
 /// - 这里**只 import domain**，不出现任何 data 层实现；
 /// - 具体实现（`Fake*Repository` / 将来的 `Http*Repository`）由组合根
 ///   `main.dart` 通过 `overrideWithValue` 注入；

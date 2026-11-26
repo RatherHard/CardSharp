@@ -30,6 +30,7 @@ _CardFields _$CardFieldsFromJson(Map<String, dynamic> json) => _CardFields(
       const <CardImage>[],
   hint: json['hint'] as String?,
   extra: json['extra'] as String?,
+  question: json['question'] as String?,
 );
 
 Map<String, dynamic> _$CardFieldsToJson(_CardFields instance) => <String, dynamic>{
@@ -38,6 +39,7 @@ Map<String, dynamic> _$CardFieldsToJson(_CardFields instance) => <String, dynami
   'images': instance.images,
   'hint': instance.hint,
   'extra': instance.extra,
+  'question': instance.question,
 };
 
 _Card _$CardFromJson(Map<String, dynamic> json) => _Card(

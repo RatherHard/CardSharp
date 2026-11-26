@@ -1,9 +1,12 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/repository_providers.dart';
+import '../../../core/di/service_providers.dart';
 import '../../../core/network/page.dart';
 import '../domain/deck.dart';
 import '../domain/deck_import.dart';
+import 'deck_cover_providers.dart';
+import 'deck_list_state.dart';
 import 'use_cases/create_deck_use_case.dart';
 import 'use_cases/delete_deck_use_case.dart';
 import 'use_cases/fetch_decks_use_case.dart';
@@ -11,7 +14,7 @@ import 'use_cases/import_deck_use_case.dart';
 import 'use_cases/update_deck_use_case.dart';
 
 /// 用例注入点。状态层只依赖用例与 domain 接口，不出现任何 data 层实现
-/// （`AGENTS.md` §5.2 分层约定；仓储端口声明在 `core/di/repository_providers.dart`）。
+/// （`AGENTS.md` §2.1 分层约定；仓储端口声明在 `core/di/repository_providers.dart`）。
 final fetchDecksUseCaseProvider = Provider<FetchDecksUseCase>(
   (Ref ref) => FetchDecksUseCase(ref.watch(deckRepositoryProvider)),
 );
@@ -32,32 +35,9 @@ final importDeckUseCaseProvider = Provider<ImportDeckUseCase>(
       ImportDeckUseCase(ref.watch(deckRepositoryProvider), ref.watch(cardRepositoryProvider)),
 );
 
-/// 书架列表状态：已加载的卡片集 + 下一页游标。
-///
-/// 用状态类而不是裸 `List<Deck>`：`hasMore` 与 `loadingMore` 也属于列表状态，
-/// 放在页面里各存一份会重复，且容易与数据不同步。
-class DeckListState {
-  const DeckListState({required this.decks, this.nextCursor, this.loadingMore = false});
-
-  final List<Deck> decks;
-
-  /// 下一页游标；null 表示已到底。
-  final String? nextCursor;
-
-  /// 正在加载下一页。
-  final bool loadingMore;
-
-  bool get hasMore => nextCursor != null;
-
-  DeckListState copyWith({List<Deck>? decks, String? nextCursor, bool? loadingMore}) =>
-      DeckListState(
-        decks: decks ?? this.decks,
-        nextCursor: nextCursor ?? this.nextCursor,
-        loadingMore: loadingMore ?? this.loadingMore,
-      );
-}
-
 /// 书架列表状态。异步用 [AsyncNotifier]，页面用 `switch` 匹配 AsyncValue。
+///
+/// 状态类本身在 [DeckListState]（freezed 生成 `copyWith`，`docs/05` §6）。
 final decksControllerProvider = AsyncNotifierProvider<DecksController, DeckListState>(
   DecksController.new,
 );
@@ -101,9 +81,24 @@ class DecksController extends AsyncNotifier<DeckListState> {
     return deck;
   }
 
+  /// 删除卡片集，并清掉本机保存的封面副本。
+  ///
+  /// 封面图不在后端契约里（`decks` 只有 `color`），是本机缓存；卡片集没了缓存也要清，
+  /// 否则重建同名集或换设备导入时会露出旧图。清理失败不算删除失败，见 [_removeLocalCover]。
   Future<void> delete(String id) async {
     await ref.read(deleteDeckUseCaseProvider).call(id);
+    await _removeLocalCover(id);
     await _reload();
+  }
+
+  /// 尽力清理本地封面：只是缓存，失败就不管了，下次读到脏记录由服务自己自愈。
+  Future<void> _removeLocalCover(String id) async {
+    try {
+      await ref.read(deckCoverServiceProvider).removeCover(id);
+      ref.invalidate(deckCoverPathProvider(id));
+    } on Object {
+      // 组合根没注入封面服务（纯数据层测试）时这里抛 StateError，忽略即可。
+    }
   }
 
   /// 更新卡片集（局部字段），成功后整体重拉，保证列表里看到的是数据源的真实状态。

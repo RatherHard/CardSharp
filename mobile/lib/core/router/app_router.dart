@@ -5,19 +5,20 @@ import 'package:material_ui/material_ui.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
+import '../../features/cards/presentation/card_page.dart';
 import '../../features/decks/presentation/deck_detail_page.dart';
 import '../../features/decks/presentation/shelf_page.dart';
+import '../../features/review/presentation/review_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/shell/presentation/placeholder_screen.dart';
-import '../l10n/app_strings.dart';
 
 /// 登录页路径。守卫与侧栏都引用它，避免字符串散落。
-const String loginPath = '/login';
+const String kLoginPath = '/login';
 
 /// 助手 / 社区两个占位 Tab 的路径。三个 Tab 各自需要一条根路径。
-const String assistantPath = '/assistant';
-const String communityPath = '/community';
+const String kAssistantPath = '/assistant';
+const String kCommunityPath = '/community';
 
 /// 路由表。
 ///
@@ -30,14 +31,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     redirect: (BuildContext context, GoRouterState state) {
       final AuthState? auth = ref.read(authControllerProvider).value;
       final bool loggedIn = auth is AuthAuthenticated;
-      final bool atLogin = state.matchedLocation == loginPath;
+      final bool atLogin = state.matchedLocation == kLoginPath;
       if (!loggedIn) {
-        return atLogin ? null : loginPath;
+        return atLogin ? null : kLoginPath;
       }
       return atLogin ? '/' : null;
     },
     routes: <RouteBase>[
-      GoRoute(path: loginPath, name: 'login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: kLoginPath, name: 'login', builder: (_, _) => const LoginPage()),
       StatefulShellRoute.indexedStack(
         builder: (
           BuildContext context,
@@ -59,11 +60,21 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     builder: (_, GoRouterState state) =>
                         DeckDetailPage(deckId: state.pathParameters['id']!),
                     routes: <RouteBase>[
-                      // 运行按钮 / 点卡片都先跳空白占位页，真正的卡片页面属于 E4。
+                      // 点卡片进浏览页：只看配图/名字/定义/Tips，不显示问题。
                       GoRoute(
-                        path: 'card',
-                        name: 'card-page',
-                        builder: (_, _) => const PlaceholderScreen(title: AppStrings.cardPageTitle),
+                        path: 'card/:cardId',
+                        name: 'card-detail',
+                        builder: (_, GoRouterState state) => CardPage(
+                          deckId: state.pathParameters['id']!,
+                          cardId: state.pathParameters['cardId']!,
+                        ),
+                      ),
+                      // 运行按钮进入复习：进度条 + 问答翻面（E4 的第一版）。
+                      GoRoute(
+                        path: 'review',
+                        name: 'review',
+                        builder: (_, GoRouterState state) =>
+                            ReviewPage(deckId: state.pathParameters['id']!),
                       ),
                     ],
                   ),
@@ -80,7 +91,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: assistantPath,
+                path: kAssistantPath,
                 name: 'assistant',
                 builder: (_, _) => const PlaceholderScreen(),
               ),
@@ -89,7 +100,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: communityPath,
+                path: kCommunityPath,
                 name: 'community',
                 builder: (_, _) => const PlaceholderScreen(),
               ),

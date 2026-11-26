@@ -3,17 +3,20 @@ import 'package:go_router/go_router.dart';
 // 与 Flutter 自带的 Card 组件同名，本文件以业务模型为准，隐藏组件版本。
 import 'package:material_ui/material_ui.dart' hide Card;
 
+import '../../../core/di/service_providers.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/network/api_error.dart';
 import '../../cards/application/cards_controller.dart';
 import '../../cards/domain/card.dart';
+import '../application/deck_cover_providers.dart';
 import '../application/decks_controller.dart';
+import '../application/deck_list_state.dart';
 import '../domain/deck.dart';
 import 'widgets/deck_cover.dart';
 import 'widgets/demo_deck_covers.dart';
 
 /// 封面可选的预设色。后端 `decks.color` 是 `varchar(9)`，这里只用 `#RRGGBB`。
-const List<String> _kCoverPalette = <String>[
+const List<String> _coverPalette = <String>[
   '#5B5BD6',
   '#0EA5E9',
   '#10B981',
@@ -30,6 +33,7 @@ const List<String> _kCoverPalette = <String>[
 /// - 展示封面 / 名称 / 简介 / 运行按钮 / 卡片列表；
 /// - 长按名称、简介、封面可修改（单击时给一次缩放 + 提示，作为「这里能改」的引导）；
 /// - 卡片长按 → 编辑 / 删除；
+/// - 右上角「导入封面」→ 选本地图片当封面（与长按封面的「选择本地图片」是同一动作）；
 /// - 右上角「多选」→ 勾选后批量删除。
 ///
 /// 底部导航栏由外层 shell 提供，本页只管内容区。
@@ -135,6 +139,14 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
       ];
     }
     return <Widget>[
+      // 图片导入入口放在「多选」旁边。本期只导入封面：后端 `decks` 契约里没有封面图
+      // 字段，图片先由 `FileDeckCoverService` 存在本机；接入后端时换成服务端上传即可，
+      // 这一层只依赖 `DeckCoverService` 端口，页面不用改。
+      TextButton(
+        key: const ValueKey<String>('deck_cover_import'),
+        onPressed: () => _pickCoverImage(deck),
+        child: const Text(AppStrings.deckCoverImportAction),
+      ),
       TextButton(
         key: const ValueKey<String>('multi_select_enter'),
         onPressed: cards.isEmpty
@@ -156,12 +168,13 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
           deck: deck,
           onPatch: ({String? title, String? description, String? color}) =>
               _patchDeck(title: title, description: description, color: color),
+          onPickCoverImage: () => _pickCoverImage(deck),
+          onRemoveCoverImage: () => _removeCoverImage(deck),
+          onPickColor: () => _pickDeckColor(deck),
         ),
         const SizedBox(height: 24),
         Text(AppStrings.deckDetailCardsTitle, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        const _ColumnHeader(),
-        const Divider(height: 1),
+        const SizedBox(height: 12),
         switch (cardsAsync) {
           AsyncData<List<Card>>() => _CardList(
             cards: cards,
@@ -170,7 +183,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
             selected: _selected,
             onToggle: _toggleSelect,
             onLongPress: (Card card) => _openCardActions(deck, card),
-            onTapCard: () => context.push('/deck/${widget.deckId}/card'),
+            onTapCard: (Card card) => context.push('/deck/${widget.deckId}/card/${card.id}'),
           ),
           AsyncError<List<Card>>() => _ListError(deckId: widget.deckId),
           _ => const Padding(
@@ -211,6 +224,42 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// 选一张本地图片作为该卡片集的封面。
+  ///
+  /// 用户取消（返回 null）时不提示、不改动原封面；成功后让封面路径重新读取。
+  Future<void> _pickCoverImage(Deck deck) async {
+    try {
+      final String? saved = await ref.read(deckCoverServiceProvider).pickAndSaveCover(deck.id);
+      if (saved == null) {
+        return;
+      }
+      ref.invalidate(deckCoverPathProvider(deck.id));
+    } on Object {
+      _showMessage(AppStrings.deckCoverUpdateFailed);
+    }
+  }
+
+  /// 移除自定义封面，回到默认白色卡堆。
+  Future<void> _removeCoverImage(Deck deck) async {
+    try {
+      await ref.read(deckCoverServiceProvider).removeCover(deck.id);
+      ref.invalidate(deckCoverPathProvider(deck.id));
+    } on Object {
+      _showMessage(AppStrings.deckCoverUpdateFailed);
+    }
+  }
+
+  /// 选封面色（走后端契约里的 `color` 字段，与封面图互不影响）。
+  Future<void> _pickDeckColor(Deck deck) async {
+    final String? picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext context) => _ColorSheet(current: deck.color),
+    );
+    if (picked != null) {
+      await _patchDeck(color: picked);
+    }
   }
 
   /// 卡片长按：弹出「编辑 / 删除」。
@@ -338,29 +387,46 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
 enum _CardAction { edit, delete }
 
 /// 头部：封面 + 名称 + 简介 + 运行按钮。名称/简介/封面支持长按修改。
-class _Header extends StatelessWidget {
-  const _Header({required this.deck, required this.onPatch});
+class _Header extends ConsumerWidget {
+  const _Header({
+    required this.deck,
+    required this.onPatch,
+    required this.onPickCoverImage,
+    required this.onRemoveCoverImage,
+    required this.onPickColor,
+  });
 
   final Deck deck;
 
   /// 局部更新：只传要改的字段，对应后端 `PATCH /decks/{id}`。
   final void Function({String? title, String? description, String? color}) onPatch;
 
+  /// 选本地图片当封面。
+  final Future<void> Function() onPickCoverImage;
+
+  /// 移除本地封面图。
+  final Future<void> Function() onRemoveCoverImage;
+
+  /// 选封面色（内部走 `PATCH` 的 color 字段）。
+  final Future<void> Function() onPickColor;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
+    final String? coverFilePath = ref.watch(deckCoverPathProvider(deck.id)).value;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _EditableTarget(
           hint: AppStrings.hintLongPressToEdit,
-          onLongPress: () => _pickColor(context),
+          onLongPress: () => _showCoverSheet(context, hasCustomCover: coverFilePath != null),
           child: SizedBox(
             width: 88,
             height: 88,
             child: DeckCover(
               tint: _parseHexColor(deck.color),
               coverAsset: demoCoverFor(deck.title),
+              coverFilePath: coverFilePath,
             ),
           ),
         ),
@@ -405,21 +471,80 @@ class _Header extends StatelessWidget {
         const SizedBox(width: 12),
         FilledButton.tonal(
           key: const ValueKey<String>('deck_run_button'),
-          onPressed: () => context.push('/deck/${deck.id}/card'),
+          onPressed: () => context.push('/deck/${deck.id}/review'),
           child: const Text(AppStrings.deckDetailRun),
         ),
       ],
     );
   }
 
-  Future<void> _pickColor(BuildContext context) async {
-    final String? picked = await showModalBottomSheet<String>(
+  /// 封面长按：一个入口收拢「换图 / 换颜色 / 移除图」。
+  Future<void> _showCoverSheet(BuildContext context, {required bool hasCustomCover}) async {
+    final _CoverAction? action = await showModalBottomSheet<_CoverAction>(
       context: context,
-      builder: (BuildContext context) => _ColorSheet(current: deck.color),
+      builder: (BuildContext context) => _CoverSheet(hasCustomCover: hasCustomCover),
     );
-    if (picked != null) {
-      onPatch(color: picked);
+    switch (action) {
+      case _CoverAction.pickImage:
+        await onPickCoverImage();
+      case _CoverAction.pickColor:
+        await onPickColor();
+      case _CoverAction.removeImage:
+        await onRemoveCoverImage();
+      case null:
+        break;
     }
+  }
+}
+
+/// 封面长按菜单的三个动作。
+enum _CoverAction { pickImage, pickColor, removeImage }
+
+/// 封面长按弹出的菜单。
+class _CoverSheet extends StatelessWidget {
+  const _CoverSheet({required this.hasCustomCover});
+
+  /// 已经有自定义封面图时才显示「移除封面图」。
+  final bool hasCustomCover;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return SafeArea(
+      key: const ValueKey<String>('deck_cover_sheet'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(AppStrings.deckCoverSheetTitle, style: theme.textTheme.titleMedium),
+            ),
+          ),
+          ListTile(
+            key: const ValueKey<String>('deck_cover_pick_image'),
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text(AppStrings.deckCoverPickImage),
+            onTap: () => Navigator.of(context).pop(_CoverAction.pickImage),
+          ),
+          ListTile(
+            key: const ValueKey<String>('deck_cover_pick_color'),
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text(AppStrings.deckCoverChangeColor),
+            onTap: () => Navigator.of(context).pop(_CoverAction.pickColor),
+          ),
+          if (hasCustomCover)
+            ListTile(
+              key: const ValueKey<String>('deck_cover_remove_image'),
+              leading: const Icon(Icons.hide_image_outlined),
+              title: const Text(AppStrings.deckCoverRemoveImage),
+              onTap: () => Navigator.of(context).pop(_CoverAction.removeImage),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 }
 
@@ -614,36 +739,6 @@ class _InlineEditableState extends State<_InlineEditable> {
   }
 }
 
-/// 列表表头：序号 / 卡片明文 / 暗文。
-class _ColumnHeader extends StatelessWidget {
-  const _ColumnHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final TextStyle? style = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: <Widget>[
-          SizedBox(width: 52, child: Text(AppStrings.deckDetailColumnIndex, style: style)),
-          Expanded(child: Text(AppStrings.deckDetailColumnPlaintext, style: style)),
-          SizedBox(
-            width: 48,
-            child: Text(
-              AppStrings.deckDetailColumnCiphertext,
-              style: style,
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CardList extends StatelessWidget {
   const _CardList({
     required this.cards,
@@ -661,60 +756,109 @@ class _CardList extends StatelessWidget {
   final Set<String> selected;
   final void Function(String cardId) onToggle;
   final void Function(Card card) onLongPress;
-  final VoidCallback onTapCard;
+  final void Function(Card card) onTapCard;
 
   @override
   Widget build(BuildContext context) {
     if (cards.isEmpty) {
       return const _EmptyCards();
     }
-    final ThemeData theme = Theme.of(context);
     return Column(
       children: <Widget>[
         for (int i = 0; i < cards.length; i++) ...<Widget>[
-          InkWell(
-            key: ValueKey<String>('deck_card_${cards[i].id}'),
-            onTap: selecting ? () => onToggle(cards[i].id) : onTapCard,
-            onLongPress: selecting ? null : () => onLongPress(cards[i]),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: <Widget>[
-                  SizedBox(
-                    width: 52,
-                    child: selecting
-                        ? Checkbox(
-                            key: ValueKey<String>('deck_card_checkbox_${cards[i].id}'),
-                            value: selected.contains(cards[i].id),
-                            onChanged: (_) => onToggle(cards[i].id),
-                          )
-                        : Text('${i + 1}', style: theme.textTheme.bodyMedium),
-                  ),
-                  Expanded(
-                    child: Text(
-                      cards[i].fields.plaintext,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 48,
-                    child: Text(
-                      AppStrings.deckCiphertextHidden,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          if (i > 0) const SizedBox(height: 10),
+          _CardBar(
+            key: ValueKey<String>('deck_card_bar_${cards[i].id}'),
+            card: cards[i],
+            index: i,
+            selecting: selecting,
+            selected: selected.contains(cards[i].id),
+            onToggle: () => onToggle(cards[i].id),
+            onLongPress: () => onLongPress(cards[i]),
+            onTap: () => onTapCard(cards[i]),
           ),
-          const Divider(height: 1),
         ],
       ],
+    );
+  }
+}
+
+/// 列表里的一张卡片：圆角长条，左侧序号（或多选框），右侧卡片名（明文）。
+///
+/// 列表**不展示暗文**，避免剧透答案；卡片正文留给卡片页（`/deck/:id/card`）。
+class _CardBar extends StatelessWidget {
+  const _CardBar({
+    super.key,
+    required this.card,
+    required this.index,
+    required this.selecting,
+    required this.selected,
+    required this.onToggle,
+    required this.onLongPress,
+    required this.onTap,
+  });
+
+  final Card card;
+  final int index;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback onToggle;
+  final VoidCallback onLongPress;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        key: ValueKey<String>('deck_card_${card.id}'),
+        onTap: selecting ? onToggle : onTap,
+        onLongPress: selecting ? null : onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            height: 56,
+            child: Row(
+              children: <Widget>[
+                SizedBox(
+                  width: 40,
+                  child: selecting
+                      ? Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Checkbox(
+                            key: ValueKey<String>('deck_card_checkbox_${card.id}'),
+                            value: selected,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (_) => onToggle(),
+                          ),
+                        )
+                      : Text(
+                          '${index + 1}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    card.fields.plaintext,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -829,7 +973,7 @@ class _ColorSheet extends StatelessWidget {
               spacing: 16,
               runSpacing: 16,
               children: <Widget>[
-                for (final String color in _kCoverPalette)
+                for (final String color in _coverPalette)
                   InkWell(
                     key: ValueKey<String>('color_option_$color'),
                     onTap: () => Navigator.of(context).pop(color),

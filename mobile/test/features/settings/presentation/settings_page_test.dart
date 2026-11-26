@@ -1,4 +1,4 @@
-import 'package:cardsharp/core/di/repository_providers.dart';
+﻿import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/core/l10n/app_strings.dart';
 import 'package:cardsharp/core/theme/app_theme.dart';
 import 'package:cardsharp/core/theme/theme_controller.dart';
@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 /// 设置页：账号展示、退出登录、主题切换。
 ///

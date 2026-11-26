@@ -18,9 +18,14 @@ abstract class CardImage with _$CardImage {
 /// 卡片内容（对应后端 `cards.fields` 这个 JSON 列）。
 ///
 /// 字段命名严格对齐 `docs/03` §4.4：
-/// - `plaintext` 明文（正面）
-/// - `ciphertext` 暗文（背面）
+/// - `plaintext` 明文（正面，本仓库当前用作卡片名，列表页显示它）
+/// - `ciphertext` 暗文（背面，卡片页显示为词条释义）
 /// - `images` / `hint` / `extra`
+///
+/// `question` 是**本地演示字段**（`docs/03` §4.4 暂无此列）：产品上「列表显示名字、
+/// 复习显示问句」需要两者并存，故先在 `fields` 里多存一个可选键。
+/// 后端接入时二选一：由后端新增 question 列，或把问句写回 `plaintext`
+/// 并另建 name 字段；届时只改这里与 `parseDeckImport`，界面不用动。
 ///
 /// 约束（`docs/03:551`）：plaintext ≤ 200 字、ciphertext ≤ 500 字，均不可为空。
 @freezed
@@ -32,6 +37,7 @@ abstract class CardFields with _$CardFields {
     @Default(<CardImage>[]) List<CardImage> images,
     String? hint,
     String? extra,
+    String? question,
   }) = _CardFields;
 
   factory CardFields.fromJson(Map<String, dynamic> json) => _$CardFieldsFromJson(json);

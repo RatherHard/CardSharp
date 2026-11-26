@@ -1,9 +1,9 @@
-import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
+﻿import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/development_account.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 void main() {
   group('FakeAuthRepository', () {

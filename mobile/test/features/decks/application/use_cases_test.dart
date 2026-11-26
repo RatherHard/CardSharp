@@ -1,4 +1,4 @@
-import 'package:cardsharp/core/network/page.dart';
+﻿import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/auth/application/use_cases/sign_in_use_case.dart';
 import 'package:cardsharp/features/auth/application/use_cases/sign_out_use_case.dart';
 import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
@@ -12,7 +12,7 @@ import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 /// 用例层是薄壳，但仍要验证「调对了实现、错误原样冒泡」，
 /// 否则接后端换实现时用例层出错不会被测试发现。

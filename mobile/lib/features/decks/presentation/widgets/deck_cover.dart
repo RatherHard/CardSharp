@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../application/deck_cover_providers.dart';
 import 'demo_deck_covers.dart';
 
 /// 卡片集封面：默认是四张白卡以右下角为轴均匀错开叠成一摞；
@@ -13,7 +15,7 @@ import 'demo_deck_covers.dart';
 /// 这里改成四张、角度均分并在最上面一张加一点向下位移，
 /// 让「一摞卡」在任何尺寸下都能完整露出，不被裁切。
 class DeckCover extends StatelessWidget {
-  const DeckCover({this.tint, this.coverAsset, super.key});
+  const DeckCover({this.tint, this.coverAsset, this.coverFilePath, super.key});
 
   /// 封面色（来自 `Deck.color`）。为 null 时用主题的 surface 色，即原样白卡。
   /// 这里只做低透明度着色，避免整块纯色盖掉「一摞纸」的层次。
@@ -23,6 +25,12 @@ class DeckCover extends StatelessWidget {
   ///
   /// 只在演示场景用（见 `demo_deck_covers.dart`）：后端契约没有封面图字段。
   final String? coverAsset;
+
+  /// 用户自选封面图片在本机的绝对路径；优先级高于 [coverAsset]。
+  ///
+  /// 由 `deckCoverPathProvider` 提供，存的是应用私有目录里的副本
+  /// （系统选择器给的临时授权重启后会失效，所以要复制，见 `FileDeckCoverService`）。
+  final String? coverFilePath;
 
   /// 从后到前：越靠后的卡角度越负，最上面一张保持 0°。
   static const List<double> _anglesDeg = <double>[-15, -10, -5, 0];
@@ -89,12 +97,7 @@ class DeckCover extends StatelessWidget {
                     ),
                     // 只有最上面一张（角度 0°）承载封面图；背面三张保持白卡，
                     // 这样既能看到「一摞卡」的层次，图片也不会被旋转裁掉。
-                    child: i == _anglesDeg.length - 1 && coverAsset != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(radius),
-                            child: Image.asset(coverAsset!, fit: BoxFit.cover),
-                          )
-                        : null,
+                    child: i == _anglesDeg.length - 1 ? _frontImage(radius) : null,
                   ),
                 ),
               ),
@@ -102,6 +105,34 @@ class DeckCover extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// 最上面那张卡的内容：优先用户自选图片，其次内置演示图，都没有就是白卡。
+  ///
+  /// 用 `BoxFit.contain`：用户选的图任意长宽比都完整显示，不裁切（2026-11-26 按要求改）。
+  ///
+  /// 图片读不出来（文件被删、格式损坏）时不抛给框架，直接退回白卡：
+  /// 封面只是装饰，不该因为它把整个书架/详情页刷成错误块。
+  Widget? _frontImage(double radius) {
+    final String? filePath = coverFilePath;
+    if (filePath != null && filePath.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.file(File(filePath), fit: BoxFit.contain, errorBuilder: _onImageError),
+      );
+    }
+    final String? assetPath = coverAsset;
+    if (assetPath != null && assetPath.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: _onImageError),
+      );
+    }
+    return null;
+  }
+
+  Widget _onImageError(BuildContext context, Object error, StackTrace? stackTrace) {
+    return const SizedBox.expand();
   }
 }
 
@@ -133,7 +164,12 @@ class DeckTile extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(child: DeckCover(coverAsset: demoCoverFor(title))),
+          Expanded(
+            child: DeckCover(
+              coverAsset: demoCoverFor(title),
+              coverFilePath: ref.watch(deckCoverPathProvider(deckId)).value,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             title,

@@ -1,4 +1,3 @@
-import '../../../cards/domain/card.dart';
 import '../../../cards/domain/card_repository.dart';
 import '../../domain/deck.dart';
 import '../../domain/deck_import.dart';
@@ -18,7 +17,12 @@ final class ImportDeckUseCase {
   final CardRepository _cards;
 
   Future<Deck> call(DeckImport data) async {
-    final Deck created = await _decks.createDeck(title: data.title);
+    // card_type / config 属于「建集」时可写字段，和标题一起创建（docs/03 §4.2、§4.3）。
+    final Deck created = await _decks.createDeck(
+      title: data.title,
+      cardType: data.cardType,
+      config: data.config,
+    );
     // 只改需要改的字段；卡片数不在这里写——统计归服务端 `stats`，
     // 假实现由 `FakeDeckRepository.cardCounter` 在读取时补上。
     final Deck updated = await _decks.updateDeck(
@@ -26,15 +30,7 @@ final class ImportDeckUseCase {
       description: data.description,
       color: data.color,
     );
-    await _cards.addCards(updated.id, <CardFields>[
-      for (final ImportedDeckCard card in data.cards)
-        CardFields(
-          plaintext: card.plaintext,
-          ciphertext: card.ciphertext,
-          hint: card.hint,
-          extra: card.extra,
-        ),
-    ]);
+    await _cards.addCards(updated.id, data.cards);
     return updated;
   }
 }

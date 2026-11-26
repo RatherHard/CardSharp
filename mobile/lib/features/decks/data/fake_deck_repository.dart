@@ -52,13 +52,22 @@ class FakeDeckRepository implements DeckRepository {
   }
 
   @override
-  Future<Deck> createDeck({required String title}) async {
+  Future<Deck> createDeck({
+    required String title,
+    String cardType = 'memory',
+    Map<String, dynamic> config = const <String, dynamic>{},
+  }) async {
     final String normalizedTitle = title.trim();
     if (normalizedTitle.isEmpty) {
       throw const DeckException(DeckFailure.titleRequired);
     }
 
-    final Deck deck = Deck(id: '${_nextId++}', title: normalizedTitle);
+    final Deck deck = Deck(
+      id: '${_nextId++}',
+      title: normalizedTitle,
+      cardType: cardType,
+      config: config,
+    );
     _decks.add(deck);
     return deck;
   }

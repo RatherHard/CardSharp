@@ -3,13 +3,16 @@ import 'package:cardsharp/app.dart';
 import 'package:cardsharp/features/auth/data/fake_auth_repository.dart';
 import 'package:cardsharp/features/auth/domain/development_account.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
-import 'package:cardsharp/features/decks/application/bundled_deck_loader.dart';
+import 'package:cardsharp/features/cards/domain/card.dart';
+import 'package:cardsharp/core/di/service_providers.dart';
+import 'package:cardsharp/features/decks/data/asset_bundled_deck_loader.dart';
+import 'package:cardsharp/features/decks/domain/bundled_deck_loader.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck_import.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_auth_storage.dart';
+import '../../../support/in_memory_auth_storage.dart';
 
 import 'package:material_ui/material_ui.dart';
 
@@ -39,7 +42,7 @@ void main() {
     expect(data.cards.length, greaterThanOrEqualTo(1));
 
     // 与 docs/03 §4.4 的字数限制保持一致，防止示例自己先违规。
-    for (final ImportedDeckCard card in data.cards) {
+    for (final CardFields card in data.cards) {
       expect(card.plaintext, isNotEmpty);
       expect(card.ciphertext, isNotEmpty);
       expect(card.plaintext.length, lessThanOrEqualTo(kPlaintextMaxLength));
