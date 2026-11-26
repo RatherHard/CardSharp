@@ -10,6 +10,7 @@ import '../../cards/domain/card.dart';
 import '../application/decks_controller.dart';
 import '../domain/deck.dart';
 import 'widgets/deck_cover.dart';
+import 'widgets/demo_deck_covers.dart';
 
 /// 封面可选的预设色。后端 `decks.color` 是 `varchar(9)`，这里只用 `#RRGGBB`。
 const List<String> _kCoverPalette = <String>[
@@ -357,7 +358,10 @@ class _Header extends StatelessWidget {
           child: SizedBox(
             width: 88,
             height: 88,
-            child: DeckCover(tint: _parseHexColor(deck.color)),
+            child: DeckCover(
+              tint: _parseHexColor(deck.color),
+              coverAsset: demoCoverFor(deck.title),
+            ),
           ),
         ),
         const SizedBox(width: 16),

@@ -4,18 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import 'demo_deck_covers.dart';
 
-/// 卡片集封面占位：四张白卡以右下角为轴均匀错开叠成一摞。
+/// 卡片集封面：默认是四张白卡以右下角为轴均匀错开叠成一摞；
+/// 传了 `coverAsset` 时，最上面那张卡换成图片（其余三张仍是白卡）。
 ///
 /// 角度与叠放方式来自设计稿 `docs/卡片页面.png`（三张手绘方框），
 /// 这里改成四张、角度均分并在最上面一张加一点向下位移，
 /// 让「一摞卡」在任何尺寸下都能完整露出，不被裁切。
 class DeckCover extends StatelessWidget {
-  const DeckCover({this.tint, super.key});
+  const DeckCover({this.tint, this.coverAsset, super.key});
 
   /// 封面色（来自 `Deck.color`）。为 null 时用主题的 surface 色，即原样白卡。
   /// 这里只做低透明度着色，避免整块纯色盖掉「一摞纸」的层次。
   final Color? tint;
+
+  /// 封面图片的 assets 路径；null 表示用白色卡堆占位。
+  ///
+  /// 只在演示场景用（见 `demo_deck_covers.dart`）：后端契约没有封面图字段。
+  final String? coverAsset;
 
   /// 从后到前：越靠后的卡角度越负，最上面一张保持 0°。
   static const List<double> _anglesDeg = <double>[-15, -10, -5, 0];
@@ -80,6 +87,14 @@ class DeckCover extends StatelessWidget {
                         ),
                       ],
                     ),
+                    // 只有最上面一张（角度 0°）承载封面图；背面三张保持白卡，
+                    // 这样既能看到「一摞卡」的层次，图片也不会被旋转裁掉。
+                    child: i == _anglesDeg.length - 1 && coverAsset != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(radius),
+                            child: Image.asset(coverAsset!, fit: BoxFit.cover),
+                          )
+                        : null,
                   ),
                 ),
               ),
@@ -118,7 +133,7 @@ class DeckTile extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Expanded(child: DeckCover()),
+          Expanded(child: DeckCover(coverAsset: demoCoverFor(title))),
           const SizedBox(height: 6),
           Text(
             title,
