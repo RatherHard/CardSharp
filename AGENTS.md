@@ -292,6 +292,30 @@ main            ← 受保护，只能通过 PR 合入
 - 找内容：`grep`（不用 `findstr`、`grep`）
 - 读文件：`read`（不用 `type`、`cat`）
 
+### 9.5 界面改动的交差标准
+
+用户看见的东西（页面、按钮、样式）只跑 `flutter test` 不算验证：测试证明的是逻辑，用户打开的是**装进设备的 App**。交差前必须在模拟器/真机上把改动流程点一遍并留截图，否则「我这边没看到」就是交差的直接后果。
+
+在 `mobile/` 下：
+
+```powershell
+flutter build apk --debug                       # 报 PathExistsException 先 flutter clean
+adb install -r build\app\outputs\flutter-apk\app-debug.apk
+adb shell am force-stop com.cardsharp.cardsharp
+adb shell am start -n com.cardsharp.cardsharp/.MainActivity
+adb shell screencap -p /sdcard/s.png            # 不要用 adb exec-out ... > s.png，二进制会被写坏
+adb pull /sdcard/s.png shot.png
+adb shell input tap <x> <y>                     # 每点一步截一张
+```
+
+交差按固定格式写：**做了什么 / 测试命令与通过数 / 截图路径 / 没验证到的**。
+
+| 规则 | 由什么拦住 |
+| --- | --- |
+| 界面可见改动交差必须附真机截图，测试结果只当补充证据 | 交差格式固定要求写截图路径；`flutter test` 测不到布局与「按钮是否可见/位置对不对」 |
+| 构建报 `PathExistsException ... 已存在时，无法创建该文件` | 先 `flutter clean` 再构建（见第 10 节） |
+| 模拟器上看到的是旧界面 | 每次交差前重新 `build + install -r`，不要复用上一轮装好的包 |
+
 ---
 
 ## 10. 已知环境限制
