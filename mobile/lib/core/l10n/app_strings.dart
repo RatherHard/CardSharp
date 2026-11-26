@@ -58,7 +58,6 @@ abstract final class AppStrings {
   static const String shelfDeleteFailed = '删除卡片集失败，请重试';
 
   // ---------------------------------------------------------------- 卡片集
-  static const String deckCoverPlaceholder = '封面图片';
   static const String createDeckTitle = '新建卡片集';
   static const String createDeckFieldLabel = '卡片集名称';
   static const String createDeckFieldHint = '例如：高等数学·极限';

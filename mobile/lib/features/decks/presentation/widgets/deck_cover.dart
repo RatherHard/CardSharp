@@ -29,7 +29,6 @@ class DeckCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final outline = scheme.onSurface.withValues(alpha: 0.22);
 
     return LayoutBuilder(
@@ -84,14 +83,6 @@ class DeckCover extends StatelessWidget {
                   ),
                 ),
               ),
-            Positioned.fill(
-              child: Center(
-                child: Text(
-                  AppStrings.deckCoverPlaceholder,
-                  style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ),
-            ),
           ],
         );
       },
