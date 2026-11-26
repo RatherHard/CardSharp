@@ -103,9 +103,12 @@ jobs:
 
       - name: 检查生成代码是否最新
         run: |
-          dart run build_runner build --delete-conflicting-outputs
+          dart run build_runner build
+          # 生成器按 80 列输出，仓库里提交的是 --line-length 100 格式化后的版本（docs/05 §9）。
+          # 先按仓库格式整理再比对，否则「生成文件必须已提交」和「格式必须符合」两条检查会互相打架。
+          dart format --line-length 100 lib
           if [[ -n "$(git status --porcelain lib)" ]]; then
-            echo "::error::生成代码未提交，请本地执行 make app-gen"
+            echo "::error::生成代码未提交，请本地执行 dart run build_runner build 后提交生成文件"
             git --no-pager diff --stat
             exit 1
           fi
@@ -118,6 +121,19 @@ jobs:
 
       - name: flutter test
         run: flutter test --coverage
+
+      - name: 检查行覆盖率门槛（≥60%，docs/05 §9）
+        run: |
+          awk -F: '
+            /^LF:/ { lf += $2 }
+            /^LH:/ { lh += $2 }
+            END {
+              if (lf == 0) { print "::error::coverage/lcov.info 里没有行覆盖数据"; exit 1 }
+              pct = lh * 100 / lf
+              printf "行覆盖率 %.2f%%（%d/%d 行）\n", pct, lh, lf
+              if (pct < 60) { print "::error::行覆盖率低于 60%，请补测试后再提 PR"; exit 1 }
+            }
+          ' coverage/lcov.info
 
       - name: 上传覆盖率
         if: always()
