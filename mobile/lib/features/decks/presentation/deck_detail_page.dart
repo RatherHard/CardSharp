@@ -8,6 +8,9 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/network/api_error.dart';
 import '../../cards/application/cards_controller.dart';
 import '../../cards/domain/card.dart';
+import '../../search/application/search_controller.dart';
+import '../../search/domain/search_hit.dart';
+import '../../search/presentation/search_results_view.dart';
 import '../application/deck_cover_providers.dart';
 import '../application/decks_controller.dart';
 import '../application/deck_list_state.dart';
@@ -47,8 +50,21 @@ class DeckDetailPage extends ConsumerStatefulWidget {
 }
 
 class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
+  /// 每次「更多搜索结果」增加的条数。
+  static const int _searchPageSize = 50;
+
   bool _selecting = false;
   final Set<String> _selected = <String>{};
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchKeyword = '';
+  int _searchLimit = _searchPageSize;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _exitSelection() {
     setState(() {
@@ -91,10 +107,34 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
       AsyncData<List<Card>>(:final List<Card> value) => value,
       _ => const <Card>[],
     };
+    final bool searching = _searchKeyword.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(deck?.title ?? AppStrings.deckDetailNotFound),
+        // 卡片集名称在下方头部已经完整显示，AppBar 不再重复；这一栏放搜索框。
+        titleSpacing: 0,
+        title: TextField(
+          key: const ValueKey<String>('deck_search_field'),
+          controller: _searchController,
+          onChanged: (String value) => setState(() {
+            _searchKeyword = value;
+            _searchLimit = _searchPageSize;
+          }),
+          textInputAction: TextInputAction.search,
+          style: Theme.of(context).textTheme.bodyMedium,
+          decoration: InputDecoration(
+            hintText: AppStrings.searchDeckSearchHint,
+            prefixIcon: const Icon(Icons.search, size: 20),
+            isDense: true,
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
         actions: _buildActions(deck, cards),
       ),
       body: SafeArea(
@@ -102,14 +142,24 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
         child: Column(
           children: <Widget>[
             Expanded(
-              child: switch (decksAsync) {
-                AsyncData<DeckListState>() when deck != null => _buildBody(deck, cardsAsync, cards),
-                AsyncData<DeckListState>() => const _CenteredHint(AppStrings.deckDetailNotFound),
-                AsyncError<DeckListState>() => const _CenteredHint(AppStrings.deckDetailLoadFailed),
-                _ => const Center(child: CircularProgressIndicator()),
-              },
+              child: searching
+                  ? _buildSearchResults()
+                  : switch (decksAsync) {
+                      AsyncData<DeckListState>() when deck != null => _buildBody(
+                        deck,
+                        cardsAsync,
+                        cards,
+                      ),
+                      AsyncData<DeckListState>() => const _CenteredHint(
+                        AppStrings.deckDetailNotFound,
+                      ),
+                      AsyncError<DeckListState>() => const _CenteredHint(
+                        AppStrings.deckDetailLoadFailed,
+                      ),
+                      _ => const Center(child: CircularProgressIndicator()),
+                    },
             ),
-            if (_selecting)
+            if (_selecting && !searching)
               _SelectionBar(
                 count: _selected.length,
                 onDelete: () => _confirmBatchDelete(deck, cards),
@@ -118,6 +168,28 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
         ),
       ),
     );
+  }
+
+  /// 本集卡片搜索：结果与卡片页打通，点一条直接进卡片页。
+  Widget _buildSearchResults() {
+    final DeckCardSearchArgs args = (
+      deckId: widget.deckId,
+      keyword: _searchKeyword,
+      hitLimit: _searchLimit,
+    );
+    return ref
+        .watch(deckCardsSearchResultProvider(args))
+        .when(
+          data: (SearchOutcome<CardSearchHit> outcome) => CardSearchResultList(
+            outcome: outcome,
+            showSourceDeck: false,
+            onOpenCard: (String deckId, String cardId) =>
+                context.push('/deck/$deckId/card/$cardId'),
+            onShowMore: () => setState(() => _searchLimit += _searchPageSize),
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) => const Center(child: Text(AppStrings.deckDetailLoadFailed)),
+        );
   }
 
   List<Widget> _buildActions(Deck? deck, List<Card> cards) {
@@ -424,7 +496,7 @@ class _Header extends ConsumerWidget {
             width: 88,
             height: 88,
             child: DeckCover(
-              tint: _parseHexColor(deck.color),
+              tint: deckTint(deck.color),
               coverAsset: demoCoverFor(deck.title),
               coverFilePath: coverFilePath,
             ),
@@ -435,26 +507,28 @@ class _Header extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _InlineEditable(
+              _ExpandableInline(
                 textKey: const ValueKey<String>('deck_detail_title'),
                 fieldKey: const ValueKey<String>('deck_edit_name_field'),
+                toggleKey: const ValueKey<String>('deck_title_toggle'),
                 value: deck.title,
                 style: theme.textTheme.titleLarge,
-                maxLines: 1,
+                collapsedLines: 1,
                 allowEmpty: false,
                 onCommit: (String value) => onPatch(title: value),
               ),
               // 简介为空时也渲染一行灰色占位，否则用户没有可长按的地方来新增简介。
               const SizedBox(height: 6),
-              _InlineEditable(
+              _ExpandableInline(
                 textKey: const ValueKey<String>('deck_detail_description'),
                 fieldKey: const ValueKey<String>('deck_edit_description_field'),
+                toggleKey: const ValueKey<String>('deck_description_toggle'),
                 value: deck.description,
                 placeholder: AppStrings.deckAddDescriptionHint,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                maxLines: 2,
+                collapsedLines: 2,
                 allowEmpty: true,
                 onCommit: (String value) => onPatch(description: value),
               ),
@@ -645,7 +719,8 @@ class _InlineEditable extends StatefulWidget {
   /// 值为空时显示的灰色提示，同时作为输入框的 hintText。
   final String? placeholder;
 
-  final int maxLines;
+  /// null 表示不限行数（长文本换行显示完整）。
+  final int? maxLines;
 
   @override
   State<_InlineEditable> createState() => _InlineEditableState();
@@ -730,11 +805,99 @@ class _InlineEditableState extends State<_InlineEditable> {
         showPlaceholder ? widget.placeholder! : widget.value,
         key: widget.textKey,
         maxLines: widget.maxLines,
-        overflow: TextOverflow.ellipsis,
+        // 不限行数时不截断，长名称/长简介直接换行显示完整。
+        overflow: widget.maxLines == null ? TextOverflow.visible : TextOverflow.ellipsis,
         style: showPlaceholder
             ? widget.style?.copyWith(color: Theme.of(context).colorScheme.outline)
             : widget.style,
       ),
+    );
+  }
+}
+
+/// 默认折叠、末尾带展开箭头的原地编辑文本。
+///
+/// 折叠时只显示 [collapsedLines] 行，末尾出现「∨」；点击展开显示全文，箭头变「∧」，
+/// 再点折叠。箭头只在文本确实超出时才出现，短文本不会多出一个无用控件。
+class _ExpandableInline extends StatefulWidget {
+  const _ExpandableInline({
+    required this.value,
+    required this.textKey,
+    required this.fieldKey,
+    required this.toggleKey,
+    required this.style,
+    required this.collapsedLines,
+    required this.allowEmpty,
+    required this.onCommit,
+    this.placeholder,
+  });
+
+  final String value;
+  final Key textKey;
+  final Key fieldKey;
+  final Key toggleKey;
+  final TextStyle? style;
+  final int collapsedLines;
+  final bool allowEmpty;
+  final ValueChanged<String> onCommit;
+  final String? placeholder;
+
+  @override
+  State<_ExpandableInline> createState() => _ExpandableInlineState();
+}
+
+class _ExpandableInlineState extends State<_ExpandableInline> {
+  /// 箭头占位宽度，测量文本可用宽度时要扣掉。
+  static const double _toggleWidth = 28;
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final String shown = widget.value.trim().isEmpty
+            ? (widget.placeholder ?? '')
+            : widget.value;
+        final TextPainter painter = TextPainter(
+          text: TextSpan(text: shown, style: widget.style),
+          maxLines: widget.collapsedLines,
+          textDirection: Directionality.of(context),
+        )..layout(maxWidth: (constraints.maxWidth - _toggleWidth).clamp(0, double.infinity));
+        final bool overflows = painter.didExceedMaxLines;
+        painter.dispose();
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: _InlineEditable(
+                textKey: widget.textKey,
+                fieldKey: widget.fieldKey,
+                value: widget.value,
+                placeholder: widget.placeholder,
+                style: widget.style,
+                maxLines: _expanded ? null : widget.collapsedLines,
+                allowEmpty: widget.allowEmpty,
+                onCommit: widget.onCommit,
+              ),
+            ),
+            if (overflows || _expanded)
+              InkWell(
+                key: widget.toggleKey,
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 2),
+                  child: Icon(
+                    _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 20,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -982,7 +1145,7 @@ class _ColorSheet extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: _parseHexColor(color),
+                        color: deckTint(color),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: current == color
@@ -1153,19 +1316,4 @@ class _CardEditDialogState extends State<_CardEditDialog> {
       ],
     );
   }
-}
-
-/// 把 `#RRGGBB` 或 `#AARRGGBB` 解析成 [Color]；空串或格式不合法时返回 null。
-///
-/// 后端 `decks.color` 是 `varchar(9)` 且允许空值，所以这里必须能安全地失败。
-Color? _parseHexColor(String value) {
-  final String hex = value.trim().replaceFirst('#', '');
-  if (hex.length != 6 && hex.length != 8) {
-    return null;
-  }
-  final int? parsed = int.tryParse(hex, radix: 16);
-  if (parsed == null) {
-    return null;
-  }
-  return Color(hex.length == 6 ? 0xFF000000 | parsed : parsed);
 }

@@ -8,6 +8,24 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../application/deck_cover_providers.dart';
 import 'demo_deck_covers.dart';
 
+/// 把 `#RRGGBB` / `#AARRGGBB` 解析成颜色；空串或格式不合法返回 null。
+///
+/// 放在封面组件旁边，书架、详情页、搜索结果都从这里取，避免各写一份解析。
+Color? deckTint(String? hex) {
+  if (hex == null) {
+    return null;
+  }
+  final String value = hex.trim().replaceFirst('#', '');
+  if (value.length != 6 && value.length != 8) {
+    return null;
+  }
+  final int? parsed = int.tryParse(value, radix: 16);
+  if (parsed == null) {
+    return null;
+  }
+  return Color(value.length == 6 ? 0xFF000000 | parsed : parsed);
+}
+
 /// 卡片集封面：默认是四张白卡以右下角为轴均匀错开叠成一摞；
 /// 传了 `coverAsset` 时，最上面那张卡换成图片（其余三张仍是白卡）。
 ///
@@ -33,18 +51,30 @@ class DeckCover extends StatelessWidget {
   final String? coverFilePath;
 
   /// 从后到前：越靠后的卡角度越负，最上面一张保持 0°。
-  static const List<double> _anglesDeg = <double>[-15, -10, -5, 0];
+  ///
+  /// 角度与错开量都调小了：盒子尺寸不变的前提下，旋转包围盒越小，
+  /// 每张卡就能占满更多空间，小尺寸（搜索结果的 48px）才看得清。
+  static const List<double> _anglesDeg = <double>[-9, -6, -3, 0];
 
   /// 封面四周留白，避免旋转后顶到边界被裁。
-  static const double _margin = 8;
+  static const double _margin = 2;
 
   /// 相邻两张卡沿垂直方向的错开量（相对边长）。
-  static const double _stepFactor = 0.05;
+  static const double _stepFactor = 0.035;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final outline = scheme.onSurface.withValues(alpha: 0.22);
+
+    // 正面：淡着色（保留图片/白卡层次）；背面几张：同色系但更深一点，
+    // 这样「一摞卡」露出的部分与封面颜色相近而不同，不会糊成一片。
+    final Color frontColor = tint == null
+        ? scheme.surface
+        : Color.alphaBlend(tint!.withValues(alpha: 0.14), scheme.surface);
+    final Color backColor = tint == null
+        ? scheme.surfaceContainerHighest
+        : Color.alphaBlend(tint!.withValues(alpha: 0.34), scheme.surface);
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -82,9 +112,7 @@ class DeckCover extends StatelessWidget {
                   alignment: Alignment.bottomRight,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: tint == null
-                          ? scheme.surface
-                          : Color.alphaBlend(tint!.withValues(alpha: 0.14), scheme.surface),
+                      color: i == _anglesDeg.length - 1 ? frontColor : backColor,
                       borderRadius: BorderRadius.circular(radius),
                       border: Border.all(color: outline),
                       boxShadow: <BoxShadow>[
@@ -142,6 +170,7 @@ class DeckTile extends ConsumerWidget {
     required this.deckId,
     required this.title,
     required this.cardCount,
+    required this.color,
     required this.onTap,
     required this.onLongPress,
     super.key,
@@ -150,6 +179,9 @@ class DeckTile extends ConsumerWidget {
   final String deckId;
   final String title;
   final int cardCount;
+
+  /// 卡片集颜色（`Deck.color`），用于封面与背后几张卡片的着色。
+  final String color;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -166,6 +198,7 @@ class DeckTile extends ConsumerWidget {
         children: <Widget>[
           Expanded(
             child: DeckCover(
+              tint: deckTint(color),
               coverAsset: demoCoverFor(title),
               coverFilePath: ref.watch(deckCoverPathProvider(deckId)).value,
             ),

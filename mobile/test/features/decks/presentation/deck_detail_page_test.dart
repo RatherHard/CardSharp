@@ -203,6 +203,98 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
+  testWidgets('本集搜索：明文命中后出现结果项', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: deckWithDescription,
+      cards: <Card>[_card('c1', '线粒体的功能是什么？', '产生 ATP', 0), _card('c2', '细胞膜的骨架是什么？', '磷脂双分子层', 1)],
+    );
+
+    await tester.enterText(find.byKey(const ValueKey<String>('deck_search_field')), '线粒体');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey<String>('search_card_c1')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('search_card_c2')), findsNothing);
+  });
+
+  testWidgets('本集搜索：暗文命中也能搜到', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: deckWithDescription,
+      cards: <Card>[_card('c1', '线粒体的功能是什么？', '产生 ATP', 0), _card('c2', '细胞膜的骨架是什么？', '磷脂双分子层', 1)],
+    );
+
+    await tester.enterText(find.byKey(const ValueKey<String>('deck_search_field')), '磷脂');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey<String>('search_card_c2')), findsOneWidget);
+    expect(find.text('暗文命中'), findsOneWidget);
+  });
+
+  testWidgets('本集搜索：无命中时显示搜索空态', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: deckWithDescription,
+      cards: <Card>[_card('c1', '线粒体的功能是什么？', '产生 ATP', 0)],
+    );
+
+    await tester.enterText(find.byKey(const ValueKey<String>('deck_search_field')), '不存在的词');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey<String>('search_empty_state')), findsOneWidget);
+  });
+
+  testWidgets('超长名称与简介默认折叠，点箭头展开后显示完整', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: const Deck(
+        id: '1',
+        title: '这是一个非常非常长的卡片集名称用来验证折叠与展开行为',
+        description:
+            '这是一段同样很长的简介，用来确认用户点一下箭头就能读完，再点一下可以折叠回两行显示。'
+            '为了确保在测试视口里真的超过两行，这里再多写一些内容，'
+            '让文本长度足够触发溢出判断，否则箭头不会出现，测试也就测不到展开逻辑。',
+      ),
+    );
+
+    // 默认折叠：名称 1 行、简介 2 行，且都出现展开箭头。
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey<String>('deck_detail_title'))).maxLines,
+      1,
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey<String>('deck_detail_description'))).maxLines,
+      2,
+    );
+    expect(find.byKey(const ValueKey<String>('deck_title_toggle')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('deck_description_toggle')), findsOneWidget);
+
+    // 展开名称：不再限制行数。
+    await tester.tap(find.byKey(const ValueKey<String>('deck_title_toggle')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey<String>('deck_detail_title'))).maxLines,
+      isNull,
+    );
+
+    // 再点一次折叠回去。
+    await tester.tap(find.byKey(const ValueKey<String>('deck_title_toggle')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey<String>('deck_detail_title'))).maxLines,
+      1,
+    );
+  });
+
+  testWidgets('短名称不显示展开箭头', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: const Deck(id: '1', title: '短名'),
+    );
+
+    expect(find.byKey(const ValueKey<String>('deck_title_toggle')), findsNothing);
+  });
+
   testWidgets('窄屏 360dp + 长标题：右上角「导入封面」「多选」不撑破 AppBar', (WidgetTester tester) async {
     // 真机宽度按 360dp 算是本项目的下限；AppBar 里塞两个文字按钮后最容易在这里溢出。
     tester.view.physicalSize = const Size(1080, 2400);

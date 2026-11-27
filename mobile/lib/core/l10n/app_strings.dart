@@ -49,7 +49,6 @@ abstract final class AppStrings {
 
   // ---------------------------------------------------------------- 书架
   static const String shelfMenuTooltip = '侧栏';
-  static const String shelfSearchHint = '搜索卡片集';
   static const String shelfCreateTooltip = '新建卡片集';
   static const String shelfEmptyTitle = '还没有卡片集';
   static const String shelfEmptySubtitle = '点右上角「+」新建一个';
@@ -194,6 +193,28 @@ abstract final class AppStrings {
   // 数据层（domain / data）只抛枚举（`AuthFailure` / `DeckFailure` / `CardFailure`），
   // 中文统一在这里翻译，避免同一句话在数据层与展示层各写一套。
   static const String deckTitleRequired = '卡片集名称不能为空';
+
+  // ---------------------------------------------------------------- 搜索
+  static const String searchModeDecks = '卡片集';
+  static const String searchModeAllCards = '全部卡片';
+
+  /// 搜索框提示文字跟着模式变。
+  static const String searchDecksHint = '搜索卡片集';
+  static const String searchAllCardsHint = '搜索全部卡片';
+  static const String searchEmptyTitle = '没有找到匹配的内容';
+  static const String searchEmptySubtitle = '换个关键词试试';
+  static const String searchMoreResults = '更多搜索结果';
+  static const String searchDeckSearchHint = '搜索本集卡片';
+
+  /// 命中字段标注。
+  static const String searchFieldPlaintext = '明文命中';
+  static const String searchFieldCiphertext = '暗文命中';
+
+  /// 卡片结果下方的来源卡片集。
+  static String searchFromDeck(String title) => '来自：$title';
+
+  /// 达到扫描上限时的提示。
+  static String searchScanLimit(int count) => '仅搜索了前 $count 张卡片，请缩小范围或指定卡片集';
 
   /// 删除或更新时找不到对应卡片集。
   static String deckNotFound(String id) => '卡片集不存在：$id';

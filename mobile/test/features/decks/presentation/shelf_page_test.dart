@@ -1,6 +1,7 @@
 import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
+import 'package:cardsharp/features/cards/domain/card.dart';
 import 'package:cardsharp/core/di/service_providers.dart';
 import 'package:cardsharp/features/decks/domain/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
@@ -9,13 +10,14 @@ import 'package:cardsharp/features/decks/domain/deck_repository.dart';
 import 'package:cardsharp/features/decks/presentation/shelf_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Card;
 
 Future<void> _pumpShelf(
   WidgetTester tester, {
   DeckRepository? repository,
   VoidCallback? onOpenDrawer,
   ImportFilePicker? picker,
+  Map<String, List<Card>> seedCards = const <String, List<Card>>{},
 }) async {
   // 默认测试视口 800x600 放不下 7 个瓦片（第 7 个不会被 build），这里加高视口。
   tester.view.physicalSize = const Size(1080, 2400);
@@ -23,7 +25,7 @@ Future<void> _pumpShelf(
   addTearDown(tester.view.reset);
 
   // 与 deckRepositoryProvider 的装配保持一致：卡片数由卡片仓储统计。
-  final FakeCardRepository cards = FakeCardRepository();
+  final FakeCardRepository cards = FakeCardRepository(seedCards);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -63,18 +65,61 @@ void main() {
     expect((delegate as SliverGridDelegateWithFixedCrossAxisCount).crossAxisCount, 3);
   });
 
-  testWidgets('搜索按名称过滤，无匹配时显示空态', (WidgetTester tester) async {
+  testWidgets('卡片集模式：输入名称后进入搜索结果，命中项可点击', (WidgetTester tester) async {
     await _pumpShelf(tester);
 
     await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), '卡片集3');
     await tester.pumpAndSettle();
-    // 搜索框里也有同样的文字，必须限定在网格内断言。
-    expect(_inGrid('卡片集3'), findsOneWidget);
-    expect(_inGrid('卡片集1'), findsNothing);
+
+    expect(find.byKey(const ValueKey<String>('search_deck_3')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('search_deck_1')), findsNothing);
+  });
+
+  testWidgets('卡片集模式：无匹配时显示搜索空态', (WidgetTester tester) async {
+    await _pumpShelf(tester);
 
     await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), '不存在的关键词');
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey<String>('shelf_empty_state')), findsOneWidget);
+
+    expect(find.byKey(const ValueKey<String>('search_empty_state')), findsOneWidget);
+  });
+
+  testWidgets('清空关键词后回到卡片集网格', (WidgetTester tester) async {
+    await _pumpShelf(tester);
+
+    await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), '卡片集3');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_search_clear')));
+    await tester.pumpAndSettle();
+
+    expect(_inGrid('卡片集1'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('search_empty_state')), findsNothing);
+  });
+
+  testWidgets('切换到「全部卡片」后能搜到卡片内容', (WidgetTester tester) async {
+    await _pumpShelf(
+      tester,
+      seedCards: <String, List<Card>>{
+        '1': <Card>[
+          const Card(
+            id: 'c1',
+            deckId: '1',
+            fields: CardFields(plaintext: '线粒体的功能是什么？', ciphertext: '产生 ATP'),
+          ),
+        ],
+      },
+    );
+
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_search_mode')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部卡片').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), 'ATP');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey<String>('search_card_c1')), findsOneWidget);
+    expect(find.text('暗文命中'), findsOneWidget);
   });
 
   testWidgets('新建卡片集：对话框空名时创建按钮禁用', (WidgetTester tester) async {
