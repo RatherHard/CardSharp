@@ -1458,6 +1458,10 @@ final cardRenderers = <String, CardRenderer>{
 
 未知类型降级为 `FallbackCardRenderer`（展示原始 JSON），保证向前兼容。
 
+> **实现现状（2026-11-28）**：`mobile/lib/shared/card_renderers/card_renderer.dart` 曾按本节落地，但全仓库 0 引用，
+> 已在 `/tidy` 中删除；当前 `memory` 卡片由 `features/cards/presentation/` 直接渲染，**没有注册表**。
+> 等真要做第二种卡片类型（如 schedule）时，再照本节新增注册表，不要提前留空壳。
+
 ---
 
 ## 8. 关键流程时序
