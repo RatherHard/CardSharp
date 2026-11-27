@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -25,18 +26,20 @@ Color? deckTint(String? hex) {
   return Color(value.length == 6 ? 0xFF000000 | parsed : parsed);
 }
 
-/// 卡片集封面：一张平放的圆角卡，颜色来自 `Deck.color`；
-/// 传了封面图片（`coverAsset` / `coverFilePath`）时按 `contain` 完整显示，不裁切。
+/// 卡片集封面：默认是四张白卡以右下角为轴均匀错开叠成一摞；
+/// 传了 `coverAsset` 时，最上面那张卡换成图片（其余三张仍是白卡）。
 ///
-/// 2026-11-28 去 AI 味（DESIGN.md「卡片放平，一层就够」）：原来的
-/// 「四张白卡旋转叠成一摞 + 阴影 + 旋转包围盒计算」拿掉，只保留一张卡。
+/// 角度与叠放方式来自设计稿 `docs/卡片页面.png`（三张手绘方框），
+/// 这里改成四张、角度均分并在最上面一张加一点向下位移，
+/// 让「一摞卡」在任何尺寸下都能完整露出，不被裁切。
 class DeckCover extends StatelessWidget {
   const DeckCover({this.tint, this.coverAsset, this.coverFilePath, super.key});
 
   /// 封面色（来自 `Deck.color`）。为 null 时用主题的 surface 色，即原样白卡。
+  /// 这里只做低透明度着色，避免整块纯色盖掉「一摞纸」的层次。
   final Color? tint;
 
-  /// 封面图片的 assets 路径；null 表示只有色块。
+  /// 封面图片的 assets 路径；null 表示用白色卡堆占位。
   ///
   /// 只在演示场景用（见 `demo_deck_covers.dart`）：后端契约没有封面图字段。
   final String? coverAsset;
@@ -47,59 +50,109 @@ class DeckCover extends StatelessWidget {
   /// （系统选择器给的临时授权重启后会失效，所以要复制，见 `FileDeckCoverService`）。
   final String? coverFilePath;
 
-  /// 封面卡圆角（DESIGN.md 的「容器」档）。
+  /// 从后到前：越靠后的卡角度越负，最上面一张保持 0°。
   ///
-  /// 小尺寸封面（搜索结果 48、回收站 56/64）按短边的 18% 收窄并夹在 8–16 之间，
-  /// 否则 16 的圆角放在 48px 缩略图上会显得过圆。
-  static const double _maxRadius = 16;
-  static const double _minRadius = 8;
+  /// 角度与错开量都调小了：盒子尺寸不变的前提下，旋转包围盒越小，
+  /// 每张卡就能占满更多空间，小尺寸（搜索结果的 48px）才看得清。
+  static const List<double> _anglesDeg = <double>[-9, -6, -3, 0];
+
+  /// 封面四周留白，避免旋转后顶到边界被裁。
+  static const double _margin = 2;
+
+  /// 相邻两张卡沿垂直方向的错开量（相对边长）。
+  static const double _stepFactor = 0.035;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final outline = scheme.onSurface.withValues(alpha: 0.22);
+
+    // 正面：淡着色（保留图片/白卡层次）；背面几张：同色系但更深一点，
+    // 这样「一摞卡」露出的部分与封面颜色相近而不同，不会糊成一片。
     final Color frontColor = tint == null
         ? scheme.surface
-        : Color.alphaBlend(tint!.withValues(alpha: 0.18), scheme.surface);
+        : Color.alphaBlend(tint!.withValues(alpha: 0.14), scheme.surface);
+    final Color backColor = tint == null
+        ? scheme.surfaceContainerHighest
+        : Color.alphaBlend(tint!.withValues(alpha: 0.34), scheme.surface);
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        if (!constraints.maxWidth.isFinite || !constraints.maxHeight.isFinite) {
+        final double width = constraints.maxWidth;
+        final double height = constraints.maxHeight;
+        if (!width.isFinite || !height.isFinite) {
           return const SizedBox.shrink();
         }
-        final double side = constraints.maxWidth < constraints.maxHeight
-            ? constraints.maxWidth
-            : constraints.maxHeight;
-        final double radius = (side * 0.18).clamp(_minRadius, _maxRadius);
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: frontColor,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: scheme.onSurface.withValues(alpha: 0.22)),
-          ),
-          // 内圆角 = 外圆角 − 边框宽度（DESIGN.md「圆角嵌套」）。
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(radius - 1),
-            child: _frontImage() ?? const SizedBox.expand(),
-          ),
+
+        final double maxAngle = _anglesDeg.first.abs() * math.pi / 180;
+        // 旋转后的包围盒相对边长的放大系数。
+        final double rotationFactor = math.cos(maxAngle) + math.sin(maxAngle);
+        final double verticalSpan = rotationFactor + (_anglesDeg.length - 1) * _stepFactor;
+        final double side = math.min(
+          (width - _margin * 2) / rotationFactor,
+          (height - _margin * 2) / verticalSpan,
+        );
+        final double step = side * _stepFactor;
+        final double upward = math.cos(maxAngle) * side + (_anglesDeg.length - 1) * step;
+        final double downward = math.sin(maxAngle) * side;
+        final double pivotX = width / 2 + rotationFactor * side / 2;
+        final double pivotY = height / 2 + (upward - downward) / 2;
+        final double radius = side * 0.09;
+
+        return Stack(
+          children: <Widget>[
+            for (int i = 0; i < _anglesDeg.length; i++)
+              Positioned(
+                left: pivotX - side,
+                top: pivotY - side - (_anglesDeg.length - 1 - i) * step,
+                width: side,
+                height: side,
+                child: Transform.rotate(
+                  angle: _anglesDeg[i] * math.pi / 180,
+                  alignment: Alignment.bottomRight,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: i == _anglesDeg.length - 1 ? frontColor : backColor,
+                      borderRadius: BorderRadius.circular(radius),
+                      border: Border.all(color: outline),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.13),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    // 只有最上面一张（角度 0°）承载封面图；背面三张保持白卡，
+                    // 这样既能看到「一摞卡」的层次，图片也不会被旋转裁掉。
+                    child: i == _anglesDeg.length - 1 ? _frontImage(radius) : null,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
   }
 
+  /// 最上面那张卡的内容：优先用户自选图片，其次内置演示图，都没有就是白卡。
+  ///
   /// 用 `BoxFit.contain`：用户选的图任意长宽比都完整显示，不裁切（2026-11-26 按要求改）。
   ///
-  /// 图片读不出来（文件被删、格式损坏）时不抛给框架，直接退回纯色卡：
+  /// 图片读不出来（文件被删、格式损坏）时不抛给框架，直接退回白卡：
   /// 封面只是装饰，不该因为它把整个书架/详情页刷成错误块。
-  Widget? _frontImage() {
+  Widget? _frontImage(double radius) {
     final String? filePath = coverFilePath;
     if (filePath != null && filePath.isNotEmpty) {
-      return SizedBox.expand(
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
         child: Image.file(File(filePath), fit: BoxFit.contain, errorBuilder: _onImageError),
       );
     }
     final String? assetPath = coverAsset;
     if (assetPath != null && assetPath.isNotEmpty) {
-      return SizedBox.expand(
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
         child: Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: _onImageError),
       );
     }
