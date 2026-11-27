@@ -477,10 +477,7 @@ class _CreateDeckDialogState extends State<_CreateDeckDialog> {
         controller: _controller,
         autofocus: true,
         maxLength: 30,
-        decoration: const InputDecoration(
-          labelText: AppStrings.createDeckFieldLabel,
-          hintText: AppStrings.createDeckFieldHint,
-        ),
+        decoration: const InputDecoration(hintText: AppStrings.createDeckFieldHint),
         onChanged: (_) => setState(() {}),
         onSubmitted: (String value) {
           if (_canSubmit) {

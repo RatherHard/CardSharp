@@ -130,7 +130,7 @@ class _ReviewBody extends StatelessWidget {
           child: Column(
             children: <Widget>[
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
                   key: const ValueKey<String>('review_progress'),
                   value: (index + 1) / total,

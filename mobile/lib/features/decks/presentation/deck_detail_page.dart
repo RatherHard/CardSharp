@@ -133,7 +133,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
             fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
             contentPadding: const EdgeInsets.symmetric(vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
           ),
@@ -672,7 +672,7 @@ class _EditableTargetState extends State<_EditableTarget> {
         child: AnimatedContainer(
           duration: _pulse,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _hinting ? scheme.primary : Colors.transparent, width: 1.5),
           ),
           padding: const EdgeInsets.all(2),
