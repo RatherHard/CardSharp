@@ -9,13 +9,14 @@ import 'package:cardsharp/features/decks/data/asset_bundled_deck_loader.dart';
 import 'package:cardsharp/features/decks/domain/bundled_deck_loader.dart';
 import 'package:cardsharp/features/decks/domain/sample_deck.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
+import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_import.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/in_memory_auth_storage.dart';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Card;
 
 /// 把已经读到的 JSON 直接交给页面。
 ///
@@ -105,5 +106,66 @@ void main() {
     // 详情页应显示第一张卡的明文，而不是空态。
     expect(find.text('还没有卡片'), findsNothing);
     expect(find.text(expected.cards.first.plaintext), findsOneWidget);
+  });
+
+  testWidgets('同一个示例导入两次：按权威编号覆盖，不长出第二份', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final String? sampleJson = await tester.runAsync(
+      () => const AssetBundledDeckLoader().loadSampleDeck(SampleDeck.naiwaFamily),
+    );
+    expect(sampleJson, isNotNull);
+    final DeckImport expected = parseDeckImport(sampleJson!);
+
+    final FakeDeckRepository decks = FakeDeckRepository();
+    final FakeCardRepository cards = FakeCardRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(FakeAuthRepository(InMemoryAuthStorage())),
+          deckRepositoryProvider.overrideWithValue(decks),
+          cardRepositoryProvider.overrideWithValue(cards),
+          bundledDeckLoaderProvider.overrideWithValue(_InMemoryBundledLoader(sampleJson)),
+        ],
+        child: const CardSharpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('login_username_field')),
+      DevelopmentAccount.username,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('login_password_field')),
+      DevelopmentAccount.password,
+    );
+    await tester.tap(find.byKey(const ValueKey<String>('login_submit_button')));
+    await tester.pumpAndSettle();
+
+    Future<void> importSample() async {
+      await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import_sample')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey<String>('shelf_sample_naiwa')));
+      await tester.pumpAndSettle();
+    }
+
+    await importSample();
+    expect(find.text(expected.title), findsOneWidget);
+
+    // 第二次导入同一示例：界面上还是只有一条，仓储里也还是一条。
+    await importSample();
+    expect(find.text(expected.title), findsOneWidget);
+    final List<Deck> imported = (await decks.fetchDecks(limit: 100)).items
+        .where((Deck deck) => deck.title == expected.title)
+        .toList();
+    expect(imported, hasLength(1));
+    // 权威覆盖后，卡片按示例重建（数量与示例一致）。
+    final List<Card> rebuilt = (await cards.fetchCards(imported.single.id, limit: 100)).items;
+    expect(rebuilt, hasLength(expected.cards.length));
   });
 }

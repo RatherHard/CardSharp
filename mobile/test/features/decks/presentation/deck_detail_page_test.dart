@@ -13,12 +13,13 @@ Future<void> _pumpDetail(
   WidgetTester tester, {
   required Deck deck,
   List<Card> cards = const <Card>[],
+  List<Deck> siblings = const <Deck>[],
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       // Riverpod 3 未导出 Override 类型，交给类型推断。
       overrides: [
-        deckRepositoryProvider.overrideWithValue(FakeDeckRepository(<Deck>[deck])),
+        deckRepositoryProvider.overrideWithValue(FakeDeckRepository(<Deck>[deck, ...siblings])),
         cardRepositoryProvider.overrideWithValue(
           FakeCardRepository(<String, List<Card>>{deck.id: cards}),
         ),
@@ -137,6 +138,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('改过的名字'), findsWidgets);
+  });
+
+  testWidgets('改名撞上别的卡片集：提示重名，标题保持原样', (WidgetTester tester) async {
+    await _pumpDetail(
+      tester,
+      deck: deckWithDescription,
+      siblings: const <Deck>[Deck(id: '2', title: '别人的卡片集')],
+    );
+
+    await tester.longPress(find.byKey(const ValueKey<String>('deck_detail_title')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey<String>('deck_edit_name_field')), '别人的卡片集');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('书架里已有同名卡片集，换一个名字吧'), findsOneWidget);
+    expect(find.text('生物学基础'), findsWidgets);
   });
 
   testWidgets('卡片编辑框里的序号从 1 开始', (WidgetTester tester) async {

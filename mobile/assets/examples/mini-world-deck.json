@@ -3,6 +3,7 @@
   "description": "按人物背景认出迷你世界的 10 位角色（来源：九游角色图鉴，2026-11-27）",
   "color": "#3B82F6",
   "card_type": "memory",
+  "source_key": "example.mini-world",
   "config": {},
   "cards": [
     {

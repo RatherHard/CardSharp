@@ -16,6 +16,8 @@ import '../application/deck_cover_providers.dart';
 import '../application/decks_controller.dart';
 import '../application/deck_list_state.dart';
 import '../domain/deck.dart';
+import '../domain/deck_repository.dart';
+import 'deck_failure_message.dart';
 import 'widgets/deck_cover.dart';
 import 'widgets/demo_deck_covers.dart';
 
@@ -285,6 +287,10 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
       await ref
           .read(decksControllerProvider.notifier)
           .updateDeck(widget.deckId, title: title, description: description, color: color);
+    } on DeckException catch (error) {
+      _showMessage(
+        deckFailureMessage(error.failure, deckId: widget.deckId) ?? AppStrings.deckEditFailed,
+      );
     } on ApiError catch (error) {
       _showMessage(error.message ?? AppStrings.unknownError);
     } on Object {

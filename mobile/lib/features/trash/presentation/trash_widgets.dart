@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../decks/domain/deck_repository.dart';
 
 /// 恢复单张卡片时用户选的目标。
 class RestoreDestination {
@@ -179,4 +180,26 @@ void showRestoreFailedToast(BuildContext context) {
       content: Text(AppStrings.trashRestoreFailed),
     ),
   );
+}
+
+/// 恢复撞名：书架里已有同名卡片集，恢复被拒绝（不产生重名）。
+void showRestoreDuplicateToast(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      key: ValueKey<String>('trash_restore_duplicate_toast'),
+      content: Text(AppStrings.deckDuplicateTitle),
+    ),
+  );
+}
+
+/// 恢复失败的统一出口：重名单独提示，其余走通用失败提示。
+///
+/// 回收站三个恢复入口（恢复整集、把单卡恢复到新集、回收站详情页）都调这里，
+/// 避免「哪种失败该说哪句话」在三处各写一遍。
+void showRestoreFailureToast(BuildContext context, Object error) {
+  if (error is DeckException && error.failure == DeckFailure.duplicateTitle) {
+    showRestoreDuplicateToast(context);
+    return;
+  }
+  showRestoreFailedToast(context);
 }

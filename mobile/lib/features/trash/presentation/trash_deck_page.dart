@@ -215,11 +215,11 @@ class _TrashDeckBody extends ConsumerWidget {
         // 整个集已恢复，回收站详情页没有内容了，退回回收站首页。
         context.pop();
       }
-    } on Object {
+    } on Object catch (error) {
       if (!context.mounted) {
         return;
       }
-      showRestoreFailedToast(context);
+      showRestoreFailureToast(context, error);
     }
   }
 }

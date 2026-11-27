@@ -8,6 +8,7 @@ import '../domain/deck.dart';
 import '../domain/deck_import.dart';
 import '../domain/deck_repository.dart';
 import '../domain/sample_deck.dart';
+import 'deck_failure_message.dart';
 import '../../search/application/search_controller.dart';
 import '../../search/application/search_query.dart';
 import '../../search/domain/search_results.dart';
@@ -58,11 +59,8 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     try {
       await ref.read(decksControllerProvider.notifier).create(title);
     } on DeckException catch (error) {
-      // 数据层只给失败原因，文案在这里翻译（`AppStrings`）。
-      _showError(switch (error.failure) {
-        DeckFailure.titleRequired => AppStrings.deckTitleRequired,
-        DeckFailure.notFound => AppStrings.shelfCreateFailed,
-      });
+      // 数据层只给失败原因，文案由 `deckFailureMessage` 统一给出。
+      _showError(deckFailureMessage(error.failure) ?? AppStrings.shelfCreateFailed);
     } on ApiError catch (error) {
       // 后端已给出可展示的说明，直接用，不再套「请重试」。
       _showError(error.message ?? AppStrings.unknownError);
@@ -191,6 +189,15 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
           .showSnackBar(SnackBar(content: Text(AppStrings.importSucceeded(deck.title))));
     } on DeckImportException catch (error) {
       _showError(_importErrorMessage(error.error));
+    } on DeckException catch (error) {
+      // 重名 / 权威编号在回收站：都发生在写库阶段，不是文件格式问题。
+      // 只有 authorityInTrash 需要导入侧专用文案，其余走统一映射。
+      _showError(
+        deckFailureMessage(error.failure) ??
+            (error.failure == DeckFailure.authorityInTrash
+                ? AppStrings.importDeckInTrash
+                : AppStrings.importFailed),
+      );
     } on ApiError catch (error) {
       _showError(error.message ?? AppStrings.unknownError);
     } on Object {
@@ -234,10 +241,9 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     try {
       await ref.read(decksControllerProvider.notifier).delete(deck.id);
     } on DeckException catch (error) {
-      _showError(switch (error.failure) {
-        DeckFailure.notFound => AppStrings.deckNotFound(deck.id),
-        DeckFailure.titleRequired => AppStrings.shelfDeleteFailed,
-      });
+      _showError(
+        deckFailureMessage(error.failure, deckId: deck.id) ?? AppStrings.shelfDeleteFailed,
+      );
     } on Object {
       _showError(AppStrings.shelfDeleteFailed);
     }

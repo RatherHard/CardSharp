@@ -3,6 +3,7 @@
   "description": "按外形特征认出奶蛙家族的成员（来源：naiwahub.com 角色图鉴，2026-11-25 抓取）",
   "color": "#10B981",
   "card_type": "memory",
+  "source_key": "example.naiwa-family",
   "cards": [
     {
       "sort_order": 1,

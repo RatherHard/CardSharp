@@ -54,7 +54,15 @@ abstract interface class CardRepository {
   /// 批量追加卡片（导入卡片集时用）。
   ///
   /// id 与排序由实现方分配；后续由数据源决定顺序，调用方不传 id。
+  /// 与 [addCards] 相对，[replaceCards] 是「整集换掉」。
   Future<void> addCards(String deckId, List<CardFields> cards);
+
+  /// 用权威版整集替换某个卡片集的全部卡片（编号命中、覆盖本地缓存时用）。
+  ///
+  /// 实现方在一个事务里**物理删除**该卡片集的所有卡片（含回收站里的、
+  /// 以及用户单独删掉的），再按 [cards] 的顺序重建——所以本地对这份卡片集
+  /// 的卡片改动会被丢弃，这是「权威版覆盖缓存」的预期语义。
+  Future<void> replaceCards(String deckId, List<CardFields> cards);
 
   /// 用户单独删掉的卡片（`deletedWithDeck` 为空），按删除时间倒序。
   ///

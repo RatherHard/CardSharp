@@ -349,11 +349,11 @@ Future<void> restoreWholeDeck(BuildContext context, WidgetRef ref, TrashedDeck i
       return;
     }
     showRestoredToast(context);
-  } on Object {
+  } on Object catch (error) {
     if (!context.mounted) {
       return;
     }
-    showRestoreFailedToast(context);
+    showRestoreFailureToast(context, error);
   }
 }
 
@@ -390,11 +390,11 @@ Future<void> restoreTrashedCard(BuildContext context, WidgetRef ref, TrashedCard
       return;
     }
     showRestoredToast(context);
-  } on Object {
+  } on Object catch (error) {
     if (!context.mounted) {
       return;
     }
-    showRestoreFailedToast(context);
+    showRestoreFailureToast(context, error);
   }
 }
 

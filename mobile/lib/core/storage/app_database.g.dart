@@ -112,6 +112,15 @@ class $LocalDecksTable extends LocalDecks with TableInfo<$LocalDecksTable, Local
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sourceKeyMeta = const VerificationMeta('sourceKey');
+  @override
+  late final GeneratedColumn<String> sourceKey = GeneratedColumn<String>(
+    'source_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -125,6 +134,7 @@ class $LocalDecksTable extends LocalDecks with TableInfo<$LocalDecksTable, Local
     createdAt,
     updatedAt,
     deletedAt,
+    sourceKey,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -197,6 +207,12 @@ class $LocalDecksTable extends LocalDecks with TableInfo<$LocalDecksTable, Local
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('source_key')) {
+      context.handle(
+        _sourceKeyMeta,
+        sourceKey.isAcceptableOrUnknown(data['source_key']!, _sourceKeyMeta),
+      );
+    }
     return context;
   }
 
@@ -247,6 +263,10 @@ class $LocalDecksTable extends LocalDecks with TableInfo<$LocalDecksTable, Local
         DriftSqlType.int,
         data['${effectivePrefix}deleted_at'],
       ),
+      sourceKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_key'],
+      ),
     );
   }
 
@@ -272,6 +292,12 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
 
   /// 软删除（`docs/02` FR-2.5 回收站）；非空表示已删除。
   final int? deletedAt;
+
+  /// 权威编号（服务端将来下发，如内置示例的 `example.naiwa-family`）。
+  ///
+  /// 服务的「身份」字段：拉取云端权威版时按它判断「本地这条是不是同一个卡片集」，
+  /// 编号相同就整条覆盖。null 表示用户手工新建、还没有资格身份。
+  final String? sourceKey;
   const LocalDeck({
     required this.id,
     required this.title,
@@ -284,6 +310,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    this.sourceKey,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -303,6 +330,9 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<int>(deletedAt);
     }
+    if (!nullToAbsent || sourceKey != null) {
+      map['source_key'] = Variable<String>(sourceKey);
+    }
     return map;
   }
 
@@ -319,6 +349,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent ? const Value.absent() : Value(deletedAt),
+      sourceKey: sourceKey == null && nullToAbsent ? const Value.absent() : Value(sourceKey),
     );
   }
 
@@ -336,6 +367,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       deletedAt: serializer.fromJson<int?>(json['deletedAt']),
+      sourceKey: serializer.fromJson<String?>(json['sourceKey']),
     );
   }
   @override
@@ -353,6 +385,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'deletedAt': serializer.toJson<int?>(deletedAt),
+      'sourceKey': serializer.toJson<String?>(sourceKey),
     };
   }
 
@@ -368,6 +401,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
     int? createdAt,
     int? updatedAt,
     Value<int?> deletedAt = const Value.absent(),
+    Value<String?> sourceKey = const Value.absent(),
   }) => LocalDeck(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -380,6 +414,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    sourceKey: sourceKey.present ? sourceKey.value : this.sourceKey,
   );
   LocalDeck copyWithCompanion(LocalDecksCompanion data) {
     return LocalDeck(
@@ -394,6 +429,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      sourceKey: data.sourceKey.present ? data.sourceKey.value : this.sourceKey,
     );
   }
 
@@ -410,7 +446,8 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
           ..write('stats: $stats, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('sourceKey: $sourceKey')
           ..write(')'))
         .toString();
   }
@@ -428,6 +465,7 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
     createdAt,
     updatedAt,
     deletedAt,
+    sourceKey,
   );
   @override
   bool operator ==(Object other) =>
@@ -443,7 +481,8 @@ class LocalDeck extends DataClass implements Insertable<LocalDeck> {
           other.stats == this.stats &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.sourceKey == this.sourceKey);
 }
 
 class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
@@ -458,6 +497,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int?> deletedAt;
+  final Value<String?> sourceKey;
   final Value<int> rowid;
   const LocalDecksCompanion({
     this.id = const Value.absent(),
@@ -471,6 +511,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.sourceKey = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalDecksCompanion.insert({
@@ -485,6 +526,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
     required int createdAt,
     required int updatedAt,
     this.deletedAt = const Value.absent(),
+    this.sourceKey = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -502,6 +544,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? deletedAt,
+    Expression<String>? sourceKey,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -516,6 +559,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (sourceKey != null) 'source_key': sourceKey,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -532,6 +576,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int?>? deletedAt,
+    Value<String?>? sourceKey,
     Value<int>? rowid,
   }) {
     return LocalDecksCompanion(
@@ -546,6 +591,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      sourceKey: sourceKey ?? this.sourceKey,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -586,6 +632,9 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<int>(deletedAt.value);
     }
+    if (sourceKey.present) {
+      map['source_key'] = Variable<String>(sourceKey.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -606,6 +655,7 @@ class LocalDecksCompanion extends UpdateCompanion<LocalDeck> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('sourceKey: $sourceKey, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1173,6 +1223,7 @@ typedef $$LocalDecksTableCreateCompanionBuilder = LocalDecksCompanion Function({
   required int createdAt,
   required int updatedAt,
   Value<int?> deletedAt,
+  Value<String?> sourceKey,
   Value<int> rowid,
 });
 typedef $$LocalDecksTableUpdateCompanionBuilder = LocalDecksCompanion Function({
@@ -1187,6 +1238,7 @@ typedef $$LocalDecksTableUpdateCompanionBuilder = LocalDecksCompanion Function({
   Value<int> createdAt,
   Value<int> updatedAt,
   Value<int?> deletedAt,
+  Value<String?> sourceKey,
   Value<int> rowid,
 });
 
@@ -1230,6 +1282,9 @@ class $$LocalDecksTableFilterComposer extends Composer<_$AppDatabase, $LocalDeck
 
   ColumnFilters<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceKey =>
+      $composableBuilder(column: $table.sourceKey, builder: (column) => ColumnFilters(column));
 }
 
 class $$LocalDecksTableOrderingComposer extends Composer<_$AppDatabase, $LocalDecksTable> {
@@ -1272,6 +1327,9 @@ class $$LocalDecksTableOrderingComposer extends Composer<_$AppDatabase, $LocalDe
 
   ColumnOrderings<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceKey =>
+      $composableBuilder(column: $table.sourceKey, builder: (column) => ColumnOrderings(column));
 }
 
 class $$LocalDecksTableAnnotationComposer extends Composer<_$AppDatabase, $LocalDecksTable> {
@@ -1314,6 +1372,9 @@ class $$LocalDecksTableAnnotationComposer extends Composer<_$AppDatabase, $Local
 
   GeneratedColumn<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceKey =>
+      $composableBuilder(column: $table.sourceKey, builder: (column) => column);
 }
 
 class $$LocalDecksTableTableManager
@@ -1353,6 +1414,7 @@ class $$LocalDecksTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> deletedAt = const Value.absent(),
+                Value<String?> sourceKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalDecksCompanion(
                 id: id,
@@ -1366,6 +1428,7 @@ class $$LocalDecksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                sourceKey: sourceKey,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1381,6 +1444,7 @@ class $$LocalDecksTableTableManager
                 required int createdAt,
                 required int updatedAt,
                 Value<int?> deletedAt = const Value.absent(),
+                Value<String?> sourceKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalDecksCompanion.insert(
                 id: id,
@@ -1394,6 +1458,7 @@ class $$LocalDecksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                sourceKey: sourceKey,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -1,6 +1,7 @@
 import '../../../core/network/page.dart';
 import '../domain/deck.dart';
 import '../domain/deck_repository.dart';
+import '../domain/deck_title.dart';
 import '../domain/trashed_deck.dart';
 
 /// 本期种子数据：6 个空卡片集。
@@ -26,6 +27,10 @@ class FakeDeckRepository implements DeckRepository {
 
   final List<Deck> _decks;
   int _nextId;
+
+  /// 卡片集 id → 权威编号。`Deck` 本身不带这个字段（服务端还没有这个列），
+  /// 假实现单独记一份，语义与 `LocalDecks.sourceKey` 一致。
+  final Map<String, String> _sourceKeys = <String, String>{};
 
   /// 回收站：卡片集 id → (卡片集, 删除前在原列表里的位置, 删除时间)。
   ///
@@ -77,10 +82,14 @@ class FakeDeckRepository implements DeckRepository {
     required String title,
     String cardType = 'memory',
     Map<String, dynamic> config = const <String, dynamic>{},
+    String? sourceKey,
   }) async {
     final String normalizedTitle = title.trim();
     if (normalizedTitle.isEmpty) {
       throw const DeckException(DeckFailure.titleRequired);
+    }
+    if (_isTitleTaken(normalizedTitle)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
     }
 
     final Deck deck = Deck(
@@ -90,6 +99,9 @@ class FakeDeckRepository implements DeckRepository {
       config: config,
     );
     _decks.add(deck);
+    if (sourceKey != null) {
+      _sourceKeys[deck.id] = sourceKey;
+    }
     return deck;
   }
 
@@ -101,13 +113,66 @@ class FakeDeckRepository implements DeckRepository {
     }
     // 局部更新语义：只改传进来的字段，其余字段保持原值。
     final Deck current = _decks[index];
+    final String nextTitle = title?.trim() ?? current.title;
+    if (nextTitle.isEmpty) {
+      throw const DeckException(DeckFailure.titleRequired);
+    }
+    if (!isSameDeckTitle(nextTitle, current.title) && _isTitleTaken(nextTitle, exceptId: id)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
+    }
     final Deck updated = current.copyWith(
-      title: title ?? current.title,
+      title: nextTitle,
       description: description ?? current.description,
       color: color ?? current.color,
     );
     _decks[index] = updated;
     return updated;
+  }
+
+  @override
+  Future<Deck> overwriteDeck(
+    String id, {
+    required String title,
+    required String description,
+    required String color,
+    required String cardType,
+    required Map<String, dynamic> config,
+  }) async {
+    final int index = _decks.indexWhere((Deck item) => item.id == id);
+    if (index < 0) {
+      throw const DeckException(DeckFailure.notFound);
+    }
+    final String normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) {
+      throw const DeckException(DeckFailure.titleRequired);
+    }
+    if (_isTitleTaken(normalizedTitle, exceptId: id)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
+    }
+    final Deck updated = _decks[index].copyWith(
+      title: normalizedTitle,
+      description: description,
+      color: color,
+      cardType: cardType,
+      config: config,
+    );
+    _decks[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<Deck?> findVisibleDeckBySourceKey(String sourceKey) async {
+    for (final Deck deck in _decks) {
+      if (_sourceKeys[deck.id] == sourceKey) {
+        return deck;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<bool> hasTrashedDeckWithSourceKey(String sourceKey) async {
+    return _trashed.keys.any((String id) => _sourceKeys[id] == sourceKey);
   }
 
   @override
@@ -132,10 +197,15 @@ class FakeDeckRepository implements DeckRepository {
 
   @override
   Future<void> restoreDeck(String id) async {
-    final ({Deck deck, int index, DateTime deletedAt})? entry = _trashed.remove(id);
+    final ({Deck deck, int index, DateTime deletedAt})? entry = _trashed[id];
     if (entry == null) {
       throw const DeckException(DeckFailure.notFound);
     }
+    // 恢复后会和书架里另一条同名卡片集撞名时，宁可不恢复，也不产生重名。
+    if (_isTitleTaken(entry.deck.title)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
+    }
+    _trashed.remove(id);
     final int at = entry.index.clamp(0, _decks.length);
     _decks.insert(at, entry.deck);
     onRestored?.call(id);
@@ -147,7 +217,13 @@ class FakeDeckRepository implements DeckRepository {
     if (_trashed.remove(id) == null) {
       return;
     }
+    _sourceKeys.remove(id);
     onPurged?.call(id);
+  }
+
+  /// 书架里是否已有同名的可见卡片集（去首尾空格、不区分大小写）。
+  bool _isTitleTaken(String title, {String? exceptId}) {
+    return _decks.any((Deck deck) => deck.id != exceptId && isSameDeckTitle(deck.title, title));
   }
 
   /// 取现有数字 id 的最大值 + 1。

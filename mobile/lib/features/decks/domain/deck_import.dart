@@ -33,6 +33,7 @@ class DeckImportException implements Exception {
 ///
 /// 字段与后端契约一一对应（`docs/03` §4.2 `decks` 表、§4.4 `cards.fields`）：
 /// - 卡片集：`title` / `description` / `color` / `card_type` / `config`
+///   （可选 `source_key`：权威编号，服务端将来下发）
 /// - 卡片：`fields{plaintext, ciphertext, images, hint, extra}` + `sort_order`
 ///
 /// `id`、`deck_id`、`stats`、`content_hash`、时间戳都不出现在导入文件里，
@@ -43,6 +44,7 @@ class DeckImport {
     this.description = '',
     this.color = '',
     this.cardType = kMemoryCardType,
+    this.sourceKey,
     this.config = const <String, dynamic>{},
     required this.cards,
   });
@@ -51,6 +53,12 @@ class DeckImport {
   final String description;
   final String color;
   final String cardType;
+
+  /// `source_key` 是权威编号（服务端将来下发，如内置示例的
+  /// `example.naiwa-family`）：同一编号视为「同一个卡片集」，
+  /// 导入/拉取时命中本地可见卡片集就整条覆盖，不会产生第二份。
+  /// 文件里不写表示这是用户自建的卡片集，没有跨端身份。
+  final String? sourceKey;
 
   /// 卡片集配置，对应后端 `decks.config`（`docs/03` §4.3）。
   /// 客户端不解析内部结构，原样透传给数据源。
@@ -88,6 +96,7 @@ DeckImport parseDeckImport(String source) {
 
   final String cardType = _memoryCardType(decoded['card_type']);
   final Map<String, dynamic> config = _config(decoded['config']);
+  final String? sourceKey = _sourceKey(decoded['source_key']);
 
   final Object? rawCards = decoded['cards'];
   if (rawCards is! List<dynamic> || rawCards.isEmpty) {
@@ -127,6 +136,7 @@ DeckImport parseDeckImport(String source) {
     color: _normalizeColor(_string(decoded['color'])),
     cardType: cardType,
     config: config,
+    sourceKey: sourceKey,
     cards: <CardFields>[for (final _IndexedCard card in ordered) card.fields],
   );
 }
@@ -220,6 +230,29 @@ Map<String, dynamic> _config(Object? raw) {
   }
   return Map<String, dynamic>.of(raw);
 }
+
+/// `source_key` 是权威编号：可缺失（用户自建卡片集），给了就必须是非空字符串。
+///
+/// 空串视为「没给」——导出工具把可选字段写成 `""` 时不该让整份文件导入失败。
+String? _sourceKey(Object? raw) {
+  if (raw == null) {
+    return null;
+  }
+  if (raw is! String) {
+    throw const DeckImportException(DeckImportError.invalidDeck);
+  }
+  final String value = raw.trim();
+  if (value.isEmpty) {
+    return null;
+  }
+  if (value.length > kSourceKeyMaxLength) {
+    throw const DeckImportException(DeckImportError.invalidDeck);
+  }
+  return value;
+}
+
+/// 权威编号长度上限：与其它标识列同量级，防止脏文件把库撑坏。
+const int kSourceKeyMaxLength = 200;
 
 String? _string(Object? value) => value is String ? value : null;
 

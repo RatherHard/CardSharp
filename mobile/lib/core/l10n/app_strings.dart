@@ -265,6 +265,12 @@ abstract final class AppStrings {
   /// 删除或更新时找不到对应卡片集。
   static String deckNotFound(String id) => '卡片集不存在：$id';
 
+  /// 书架里已有同名卡片集（新建 / 改名 / 从回收站恢复都会遇到）。
+  static const String deckDuplicateTitle = '书架里已有同名卡片集，换一个名字吧';
+
+  /// 拉取时命中「同编号的卡片集在回收站里」：跳过，不复活也不建副本。
+  static const String importDeckInTrash = '这个卡片集在回收站里，先恢复或永久删除再导入';
+
   /// 后端异常但没有给出可展示说明时的兜底。
   static const String unknownError = '未知错误';
 

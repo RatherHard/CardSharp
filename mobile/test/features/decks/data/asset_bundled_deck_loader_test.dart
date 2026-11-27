@@ -24,6 +24,8 @@ void main() {
     final DeckImport deck = parseDeckImport(source);
 
     expect(deck.title, AppStrings.sampleDeckTitle);
+    // 内置示例带权威编号：反复导入时按编号覆盖同一条，不长出第二个。
+    expect(deck.sourceKey, 'example.naiwa-family');
     expect(deck.cards, isNotEmpty);
     expect(demoCoverFor(deck.title), isNotNull);
     for (final CardFields card in deck.cards) {
@@ -37,6 +39,7 @@ void main() {
     final DeckImport deck = parseDeckImport(source);
 
     expect(deck.title, AppStrings.sampleDeckMiniWorldTitle);
+    expect(deck.sourceKey, 'example.mini-world');
     expect(deck.cards, hasLength(10));
     expect(deck.color, '#3B82F6');
     // 用户给了迷你世界的封面图，现在也有演示封面；色块仍作为背景兜底。

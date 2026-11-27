@@ -188,6 +188,62 @@ void main() {
     expect(find.text('文件不是有效的 JSON'), findsOneWidget);
   });
 
+  testWidgets('新建同名卡片集：提示重名，列表不新增', (WidgetTester tester) async {
+    await _pumpShelf(tester);
+
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_create')));
+    await tester.pumpAndSettle();
+    // 种子库里已有「卡片集1」；比较时去空格、不区分大小写。
+    await tester.enterText(find.byKey(const ValueKey<String>('create_deck_field')), '  卡片集1  ');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('create_deck_confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('书架里已有同名卡片集，换一个名字吧'), findsOneWidget);
+    expect(find.text('0 张卡片'), findsNWidgets(6));
+  });
+
+  testWidgets('导入与现有卡片集同名的文件：拒绝并提示重名', (WidgetTester tester) async {
+    await _pumpShelf(
+      tester,
+      picker: const _FakePicker(
+        '{"title":"卡片集1","cards":[{"fields":{"plaintext":"问一","ciphertext":"答一"}}]}',
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('书架里已有同名卡片集，换一个名字吧'), findsOneWidget);
+    expect(find.text('0 张卡片'), findsNWidgets(6));
+  });
+
+  testWidgets('带权威编号的卡片集导入两次：覆盖同一条，不长出第二个', (WidgetTester tester) async {
+    const String authorityJson =
+        '{"title":"奶蛙家族图鉴","source_key":"example.naiwa-family",'
+        '"cards":[{"fields":{"plaintext":"问一","ciphertext":"答一"}}]}';
+    await _pumpShelf(tester, picker: const _FakePicker(authorityJson));
+
+    Future<void> importOnce() async {
+      await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import')));
+      await tester.pumpAndSettle();
+    }
+
+    await importOnce();
+    expect(find.text('奶蛙家族图鉴'), findsOneWidget);
+    expect(find.text('1 张卡片'), findsOneWidget);
+
+    await importOnce();
+    expect(find.text('奶蛙家族图鉴'), findsOneWidget);
+    expect(find.text('1 张卡片'), findsOneWidget);
+  });
+
   testWidgets('长按卡片集二次确认后删除', (WidgetTester tester) async {
     await _pumpShelf(tester);
 
@@ -242,11 +298,28 @@ class _BrokenRepository implements DeckRepository {
     required String title,
     String cardType = 'memory',
     Map<String, dynamic> config = const <String, dynamic>{},
+    String? sourceKey,
   }) async => throw StateError('boom');
 
   @override
   Future<Deck> updateDeck(String id, {String? title, String? description, String? color}) async =>
       throw StateError('boom');
+
+  @override
+  Future<Deck> overwriteDeck(
+    String id, {
+    required String title,
+    required String description,
+    required String color,
+    required String cardType,
+    required Map<String, dynamic> config,
+  }) async => throw StateError('boom');
+
+  @override
+  Future<Deck?> findVisibleDeckBySourceKey(String sourceKey) async => throw StateError('boom');
+
+  @override
+  Future<bool> hasTrashedDeckWithSourceKey(String sourceKey) async => throw StateError('boom');
 
   @override
   Future<void> deleteDeck(String id) async => throw StateError('boom');

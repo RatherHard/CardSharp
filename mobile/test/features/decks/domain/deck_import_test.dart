@@ -231,4 +231,45 @@ void main() {
       );
     });
   });
+
+  group('source_key（权威编号）', () {
+    test('有值时就解析出编号', () {
+      final DeckImport data = parseDeckImport(
+        deckJson(extra: ',"source_key":"example.naiwa-family"', cards: cardJson()),
+      );
+      expect(data.sourceKey, 'example.naiwa-family');
+    });
+
+    test('缺省时编号为 null（视为用户自建卡片集）', () {
+      final DeckImport data = parseDeckImport(deckJson(cards: cardJson()));
+      expect(data.sourceKey, isNull);
+    });
+
+    test('两端空白会去掉，空串按缺省处理', () {
+      final DeckImport trimmed = parseDeckImport(
+        deckJson(extra: ',"source_key":"  example.mini-world  "', cards: cardJson()),
+      );
+      expect(trimmed.sourceKey, 'example.mini-world');
+
+      final DeckImport blank = parseDeckImport(
+        deckJson(extra: ',"source_key":"   "', cards: cardJson()),
+      );
+      expect(blank.sourceKey, isNull);
+    });
+
+    test('不是字符串报 invalidDeck', () {
+      expect(
+        () => parseDeckImport(deckJson(extra: ',"source_key":123', cards: cardJson())),
+        throwsImportError(DeckImportError.invalidDeck),
+      );
+    });
+
+    test('超过 200 字符报 invalidDeck', () {
+      final String longKey = 'k' * (kSourceKeyMaxLength + 1);
+      expect(
+        () => parseDeckImport(deckJson(extra: ',"source_key":"$longKey"', cards: cardJson())),
+        throwsImportError(DeckImportError.invalidDeck),
+      );
+    });
+  });
 }

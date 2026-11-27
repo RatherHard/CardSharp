@@ -16,6 +16,9 @@ class LocalCardRepository implements CardRepository {
 
   final AppDatabase _db;
 
+  /// 整集替换时用来区分同一毫秒内不同批次的 id，避免主键撞号。
+  static int _batchSeq = 0;
+
   @override
   Future<PagedResult<Card>> fetchCards(String deckId, {String? cursor, int limit = 50}) async {
     final int offset = int.tryParse(cursor ?? '') ?? 0;
@@ -206,6 +209,34 @@ class LocalCardRepository implements CardRepository {
           ),
         );
       }
+    });
+  }
+
+  @override
+  Future<void> replaceCards(String deckId, List<CardFields> cards) async {
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    // 同一毫秒内多次整集替换时用来区分 id 批次，避免主键撞号。
+    final int batch = _batchSeq++;
+    await _db.transaction(() async {
+      // 权威版覆盖：该卡片集名下的卡片一律物理删掉（含回收站里的、以及用户
+      // 单独删进回收站的），再按权威顺序重建。本地改动会被丢弃，这是预期语义。
+      await (_db.delete(_db.localCards)..where((LocalCards t) => t.deckId.equals(deckId))).go();
+      await _db.batch((Batch batchWriter) {
+        for (int i = 0; i < cards.length; i++) {
+          batchWriter.insert(
+            _db.localCards,
+            LocalCardsCompanion.insert(
+              // 本地生成的 id；接后端后一律由服务端分配。
+              id: 'local-$now-$batch-$i',
+              deckId: deckId,
+              fields: jsonEncode(cards[i].toJson()),
+              sortOrder: Value<int>(i),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        }
+      });
     });
   }
 

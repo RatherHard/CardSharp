@@ -120,6 +120,29 @@ class FakeCardRepository implements CardRepository {
     }
   }
 
+  @override
+  Future<void> replaceCards(String deckId, List<CardFields> cards) async {
+    // 权威版覆盖：先清掉该卡片集名下所有卡片——包括回收站里单独删的
+    // 和跟着卡片集删的——再按权威顺序重建。
+    _trashed.removeWhere(
+      (String _, ({Card card, DateTime deletedAt, String? withDeck}) entry) =>
+          entry.card.deckId == deckId,
+    );
+    final List<Card> rebuilt = <Card>[];
+    for (int i = 0; i < cards.length; i++) {
+      rebuilt.add(
+        Card(
+          // 仅在假实现里自增 id：接后端后 id 由服务端分配，客户端不生成。
+          id: '${deckId}_${_seq++}',
+          deckId: deckId,
+          fields: cards[i],
+          sortOrder: i,
+        ),
+      );
+    }
+    _cards[deckId] = rebuilt;
+  }
+
   // ---- 回收站 ----------------------------------------------------------
 
   /// 假实现专用：模拟「删卡片集时把它下面的卡片一起带走」。

@@ -112,6 +112,22 @@ void main() {
     expect((await seed.cards.fetchCards('1', limit: 10)).items, hasLength(1));
   });
 
+  testWidgets('恢复撞上同名卡片集：提示重名，回收站里的集原样留着', (WidgetTester tester) async {
+    final ({FakeDeckRepository decks, FakeCardRepository cards}) seed = _seedTrash();
+    await seed.decks.deleteDeck('1');
+    // 回收站不占名：删除后又能用同名新建一个。
+    await seed.decks.createDeck(title: '奶蛙家族图鉴');
+    await _pumpTrash(tester, decks: seed.decks, cards: seed.cards);
+
+    await tester.tap(find.byKey(const ValueKey<String>('trash_restore_deck_1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('trash_restore_deck_confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('书架里已有同名卡片集，换一个名字吧'), findsOneWidget);
+    expect(await seed.decks.fetchTrashedDecks(), hasLength(1));
+  });
+
   testWidgets('单张恢复：选「新建卡片集」后卡片进新集', (WidgetTester tester) async {
     final ({FakeDeckRepository decks, FakeCardRepository cards}) seed = _seedTrash();
     await seed.cards.deleteCard('c2');

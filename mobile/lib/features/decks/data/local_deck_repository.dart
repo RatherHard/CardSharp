@@ -6,6 +6,7 @@ import '../../../core/network/page.dart';
 import '../../../core/storage/app_database.dart';
 import '../domain/deck.dart';
 import '../domain/deck_repository.dart';
+import '../domain/deck_title.dart';
 import '../domain/trashed_deck.dart';
 
 /// 基于 Drift 的卡片集仓储：数据落在手机本地库里，重启不丢。
@@ -56,15 +57,19 @@ class LocalDeckRepository implements DeckRepository {
     required String title,
     String cardType = 'memory',
     Map<String, dynamic> config = const <String, dynamic>{},
+    String? sourceKey,
   }) async {
-    final String normalized = title.trim();
-    if (normalized.isEmpty) {
+    final String trimmed = title.trim();
+    if (trimmed.isEmpty) {
       throw const DeckException(DeckFailure.titleRequired);
+    }
+    if (await _isTitleTaken(trimmed)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
     }
     final int now = DateTime.now().millisecondsSinceEpoch;
     final LocalDeck row = LocalDeck(
       id: 'local-$now-${_seq++}',
-      title: normalized,
+      title: trimmed,
       description: '',
       color: '',
       cardType: cardType,
@@ -72,6 +77,7 @@ class LocalDeckRepository implements DeckRepository {
       stats: '{}',
       createdAt: now,
       updatedAt: now,
+      sourceKey: sourceKey,
     );
     await _db.into(_db.localDecks).insert(row);
     return _toDeck(row);
@@ -86,6 +92,10 @@ class LocalDeckRepository implements DeckRepository {
     final String nextTitle = title?.trim() ?? row.title;
     if (nextTitle.isEmpty) {
       throw const DeckException(DeckFailure.titleRequired);
+    }
+    // 只在标题真的变了时才查重：避免「只改颜色」被同名卡片集误拦。
+    if (!isSameDeckTitle(nextTitle, row.title) && await _isTitleTaken(nextTitle, exceptId: id)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
     }
     await (_db.update(_db.localDecks)..where((LocalDecks t) => t.id.equals(id))).write(
       LocalDecksCompanion(
@@ -109,8 +119,88 @@ class LocalDeckRepository implements DeckRepository {
         stats: row.stats,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
+        sourceKey: row.sourceKey,
       ),
     );
+  }
+
+  @override
+  Future<Deck> overwriteDeck(
+    String id, {
+    required String title,
+    required String description,
+    required String color,
+    required String cardType,
+    required Map<String, dynamic> config,
+  }) async {
+    final LocalDeck? row = await _find(id);
+    if (row == null) {
+      throw const DeckException(DeckFailure.notFound);
+    }
+    final String trimmed = title.trim();
+    if (trimmed.isEmpty) {
+      throw const DeckException(DeckFailure.titleRequired);
+    }
+    if (await _isTitleTaken(trimmed, exceptId: id)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
+    }
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final String encodedConfig = jsonEncode(config);
+    await (_db.update(_db.localDecks)..where((LocalDecks t) => t.id.equals(id))).write(
+      LocalDecksCompanion(
+        title: Value<String>(trimmed),
+        description: Value<String>(description),
+        color: Value<String>(color),
+        cardType: Value<String>(cardType),
+        config: Value<String>(encodedConfig),
+        updatedAt: Value<int>(now),
+      ),
+    );
+    return _toDeck(
+      LocalDeck(
+        id: row.id,
+        title: trimmed,
+        description: description,
+        color: color,
+        cardType: cardType,
+        folderId: row.folderId,
+        config: encodedConfig,
+        stats: row.stats,
+        createdAt: row.createdAt,
+        updatedAt: now,
+        sourceKey: row.sourceKey,
+      ),
+    );
+  }
+
+  @override
+  Future<Deck?> findVisibleDeckBySourceKey(String sourceKey) async {
+    final LocalDeck? row =
+        await (_db.select(_db.localDecks)
+              ..where((LocalDecks t) => t.sourceKey.equals(sourceKey) & t.deletedAt.isNull())
+              ..limit(1))
+            .getSingleOrNull();
+    return row == null ? null : _toDeck(row);
+  }
+
+  @override
+  Future<bool> hasTrashedDeckWithSourceKey(String sourceKey) async {
+    final LocalDeck? row =
+        await (_db.select(_db.localDecks)
+              ..where((LocalDecks t) => t.sourceKey.equals(sourceKey) & t.deletedAt.isNotNull())
+              ..limit(1))
+            .getSingleOrNull();
+    return row != null;
+  }
+
+  /// 书架里是否已有同名的可见卡片集（去首尾空格、不区分大小写）。
+  ///
+  /// 回收站里的卡片集不占名，所以查询只限 `deletedAt isNull`。
+  Future<bool> _isTitleTaken(String title, {String? exceptId}) async {
+    final List<LocalDeck> visible = await (_db.select(
+      _db.localDecks,
+    )..where((LocalDecks t) => t.deletedAt.isNull())).get();
+    return visible.any((LocalDeck row) => row.id != exceptId && isSameDeckTitle(row.title, title));
   }
 
   @override
@@ -172,6 +262,10 @@ class LocalDeckRepository implements DeckRepository {
     )..where((LocalDecks t) => t.id.equals(id) & t.deletedAt.isNotNull())).getSingleOrNull();
     if (row == null) {
       throw const DeckException(DeckFailure.notFound);
+    }
+    // 恢复后会和书架里另一条同名卡片集撞名时，宁可不恢复，也不产生重名。
+    if (await _isTitleTaken(row.title)) {
+      throw const DeckException(DeckFailure.duplicateTitle);
     }
     final int now = DateTime.now().millisecondsSinceEpoch;
     await _db.transaction(() async {
