@@ -77,7 +77,7 @@ flutter build apk --debug        # 涉及界面/插件时
 
 **工具偏好**：找文件用 `glob`，搜内容用 `grep`，读文件用 `read`（不用 shell 等价命令）。
 
-**界面可见改动的交差**（细则与命令见 [docs/04 §10](docs/04-移动端开发须知.md)）：
+**界面可见改动的交差**（细则与命令见 [docs/05 §10](docs/05-工程规范.md)）：
 
 - 必须 `flutter build apk --debug` + `adb install -r` 后在真机/模拟器点一遍，逐步截图；只跑 `flutter test` 不算验证。
 - 交差固定写四件套：**做了什么 / 测试命令与通过数 / 截图路径 / 没验证到的**。
@@ -85,7 +85,7 @@ flutter build apk --debug        # 涉及界面/插件时
 
 ## 已知环境限制
 
-完整清单见 [docs/04 §5 与 §12](docs/04-移动端开发须知.md)，最容易踩的三条：
+完整清单见 [docs/04 §5](docs/04-移动端开发须知.md) 与 [docs/05 §12](docs/05-工程规范.md)，最容易踩的三条：
 
 - GitHub HTTPS 被重置 → git 走 SSH（`~/.ssh/config` 已指向 `ssh.github.com:443`）。
 - Flutter/pub 走国内镜像；`sqlite3` 原生库从 GitHub Release 下载，需 `mobile/pubspec.yaml` 里的 `url_pattern` 镜像（换到能直连的网络后可删）。

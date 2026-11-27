@@ -21,17 +21,9 @@ version: 1.0.0+1
 environment:
   sdk: ^3.14.0
 
-# SQLite 原生库来源。
-#
-# 默认行为是从 GitHub Releases 下载预编译库；在无法访问
-# release-assets.githubusercontent.com 的网络环境下会构建失败。
-# 这里改用操作系统自带的 SQLite：
-#   - Windows: winsqlite3.dll（System32 自带）
-#   - Android/iOS/macOS/Linux: 系统 libsqlite3
-#
-# 代价：各平台 SQLite 版本与编译选项不一致（可能缺少 FTS5 等）。
-# 若后续需要 FTS5 / 加密，改用 `source: sqlite3` 并通过 `url_pattern`
-# 指向内部制品库。
+# SQLite 原生库来源：见下方 hooks.user_defines.sqlite3。
+# 打包预编译 sqlite3（source: sqlite3），**不走系统库**；因 GitHub Release 直连超时，
+# 用 url_pattern 指向 ghfast.top 镜像，换到可直连网络后可删掉该行。
 hooks:
   user_defines:
     sqlite3:
