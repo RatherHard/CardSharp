@@ -35,10 +35,13 @@ environment:
 hooks:
   user_defines:
     sqlite3:
-      # 用打包进 APK 的 sqlite3（由 sqlite3_flutter_libs 提供），**不用系统库**：
-      # Android 7+ 不再向应用暴露系统 libsqlite3.so，`source: system` 在真机上
-      # 会直接报 dlopen failed，表现为「卡片集加载失败」。
+      # 用打包进 APK 的 sqlite3（由 sqlite3 的 build hook 下载预编译库），
+      # **不用系统库**：Android 7+ 不再向应用暴露系统 libsqlite3.so，
+      # `source: system` 在真机上会直接报 dlopen failed，表现为「卡片集加载失败」。
       source: sqlite3
+      # GitHub Release 在本机网络下不可直连（连接超时），改用 ghfast.top 镜像拉取
+      # 同名产物；$RELEASE_TAG / $FILENAME 由 sqlite3 的 build hook 替换。
+      url_pattern: https://ghfast.top/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions

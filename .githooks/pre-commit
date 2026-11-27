@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# 提交钩子：拦住「新出现的大文件」和「跨过 20 KB 线的文件」。
+#
+# 启用（每个 clone 各一次）：git config core.hooksPath .githooks
+# 已经超过 20 KB 的历史文件（deck_detail_page.dart 等）不拦，只打提醒：
+# 否则这些文件以后每改一次都提交不了，本末倒置。
+# 生成代码、锁文件、资源与构建产物不在检查范围。
+set -u
+
+LIMIT_KB=20
+LIMIT_BYTES=$((LIMIT_KB * 1024))
+failed=0
+
+is_skipped() {
+  case "$1" in
+    *.g.dart | *.freezed.dart | pubspec.lock) return 0 ;;
+    assets/* | */assets/* | build/* | */build/*) return 0 ;;
+  esac
+  return 1
+}
+
+current_size() {
+  git cat-file -s ":$1" 2>/dev/null || echo 0
+}
+
+head_size() {
+  head_blob=$(git rev-parse "HEAD:$1" 2>/dev/null) || { echo 0; return; }
+  git cat-file -s "$head_blob" 2>/dev/null || echo 0
+}
+
+# `git diff --name-status -z` 的记录是「状态\0路径\0」，成对读。
+while IFS= read -r -d '' status && IFS= read -r -d '' file; do
+  [ -n "$file" ] || continue
+  is_skipped "$file" && continue
+
+  size=$(current_size "$file")
+  [ "$size" -gt "$LIMIT_BYTES" ] || continue
+  kb=$((size / 1024))
+
+  if [ "$status" = "A" ]; then
+    echo "[pre-commit] 新增文件 $file = ${kb} KB，超过 ${LIMIT_KB} KB" >&2
+    failed=1
+    continue
+  fi
+
+  old_size=$(head_size "$file")
+  if [ "$old_size" -le "$LIMIT_BYTES" ]; then
+    echo "[pre-commit] $file 从 $((old_size / 1024)) KB 涨到 ${kb} KB，跨过了 ${LIMIT_KB} KB 线" >&2
+    failed=1
+  else
+    echo "[pre-commit] 提醒：$file 已有 ${kb} KB（超过 ${LIMIT_KB} KB），建议下次改动时拆分" >&2
+  fi
+done < <(git diff --cached --name-status --diff-filter=ACM -z)
+
+if [ "$failed" -ne 0 ]; then
+  echo "" >&2
+  echo "请把上面的新文件按功能拆开再提交；确实需要大文件时，说明理由并与维护者确认。" >&2
+  exit 1
+fi
+
+exit 0

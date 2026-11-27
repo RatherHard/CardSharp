@@ -41,6 +41,14 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    lint {
+        // AGP 的 lint 在分析依赖里的 Java 文件时会崩（NoSuchMethodError:
+        // JavaDocParser.parseDataItem），导致 assembleRelease 直接失败；不影响产物，
+        // 先关掉 release 的 lint 检查。需要静态检查走 `flutter analyze` 与 CI。
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 kotlin {
