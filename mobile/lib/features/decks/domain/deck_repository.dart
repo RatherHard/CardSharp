@@ -1,5 +1,6 @@
 import '../../../core/network/page.dart';
 import 'deck.dart';
+import 'trashed_deck.dart';
 
 /// 卡片集数据源的失败原因。
 ///
@@ -52,8 +53,26 @@ abstract interface class DeckRepository {
   /// 覆盖成客户端的默认值。
   Future<Deck> updateDeck(String id, {String? title, String? description, String? color});
 
-  /// 删除卡片集。`docs/02` FR-2.5 要求进回收站，本期为就地删除。
+  /// 删除卡片集。`docs/02` FR-2.5：**移入回收站**，不是物理删除。
   ///
+  /// 卡片集自己打上 `deletedAt`；它下面所有卡片（含更早单独删掉的）
+  /// 一起标记成「被这次删除带走」，这样它们在回收站里只出现在这个集下面。
   /// 目标不存在时抛 [DeckException]（failure = [DeckFailure.notFound]）。
   Future<void> deleteDeck(String id);
+
+  /// 回收站里的卡片集，按删除时间倒序。
+  Future<List<TrashedDeck>> fetchTrashedDecks();
+
+  /// 把卡片集从回收站恢复：集本身恢复可见，随它一起被删的卡片一起恢复。
+  ///
+  /// 删除前被用户单独删掉、之后又被合并进这次删除的卡片也算这次带走的，
+  /// 会一起回来（合并语义见 `docs/decisions-trash.md`）。
+  /// 目标不存在时抛 [DeckException]（failure = [DeckFailure.notFound]）。
+  Future<void> restoreDeck(String id);
+
+  /// 永久删除回收站里的卡片集（物理删除，不可恢复）。
+  ///
+  /// 只对「在回收站里」的卡片集生效：集本身连同 `deletedWithDeck == id` 的卡片
+  /// 一起从库里抹掉；不在回收站或不存在时什么都不做（幂等）。
+  Future<void> purgeDeck(String id);
 }

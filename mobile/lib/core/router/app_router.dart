@@ -12,6 +12,8 @@ import '../../features/review/presentation/review_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/shell/presentation/placeholder_screen.dart';
+import '../../features/trash/presentation/trash_deck_page.dart';
+import '../../features/trash/presentation/trash_page.dart';
 
 /// 登录页路径。守卫与侧栏都引用它，避免字符串散落。
 const String kLoginPath = '/login';
@@ -82,6 +84,20 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
                     path: 'settings',
                     name: 'settings',
                     builder: (_, _) => const SettingsPage(),
+                  ),
+                  // 回收站：按天分组列出删掉的卡片集与卡片，可恢复（E3 之外的降级方案）。
+                  GoRoute(
+                    path: 'trash',
+                    name: 'trash',
+                    builder: (_, _) => const TrashPage(),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'deck/:id',
+                        name: 'trash-deck',
+                        builder: (_, GoRouterState state) =>
+                            TrashDeckPage(deckId: state.pathParameters['id']!),
+                      ),
+                    ],
                   ),
                 ],
               ),

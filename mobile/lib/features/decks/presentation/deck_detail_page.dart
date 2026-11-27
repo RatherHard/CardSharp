@@ -9,7 +9,8 @@ import '../../../core/network/api_error.dart';
 import '../../cards/application/cards_controller.dart';
 import '../../cards/domain/card.dart';
 import '../../search/application/search_controller.dart';
-import '../../search/domain/search_hit.dart';
+import '../../search/domain/search_limits.dart';
+import '../../search/domain/search_results.dart';
 import '../../search/presentation/search_results_view.dart';
 import '../application/deck_cover_providers.dart';
 import '../application/decks_controller.dart';
@@ -51,7 +52,7 @@ class DeckDetailPage extends ConsumerStatefulWidget {
 
 class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
   /// 每次「更多搜索结果」增加的条数。
-  static const int _searchPageSize = 50;
+  static const int _searchPageSize = kSearchHitLimit;
 
   bool _selecting = false;
   final Set<String> _selected = <String>{};
@@ -170,21 +171,21 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
     );
   }
 
-  /// 本集卡片搜索：结果与卡片页打通，点一条直接进卡片页。
+  /// 详情页搜索：一次搜全部——同级（本集卡片）在前，上级（本卡片集自己）在后。
   Widget _buildSearchResults() {
-    final DeckCardSearchArgs args = (
+    final DeckSearchArgs args = (
       deckId: widget.deckId,
       keyword: _searchKeyword,
       hitLimit: _searchLimit,
     );
     return ref
-        .watch(deckCardsSearchResultProvider(args))
+        .watch(deckSearchResultsProvider(args))
         .when(
-          data: (SearchOutcome<CardSearchHit> outcome) => CardSearchResultList(
-            outcome: outcome,
-            showSourceDeck: false,
+          data: (DeckSearchResults results) => DeckSearchResultView(
+            results: results,
             onOpenCard: (String deckId, String cardId) =>
                 context.push('/deck/$deckId/card/$cardId'),
+            onOpenDeck: (String deckId) => context.push('/deck/$deckId'),
             onShowMore: () => setState(() => _searchLimit += _searchPageSize),
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -1232,8 +1233,10 @@ class _CardEditDialogState extends State<_CardEditDialog> {
       setState(() => _error = AppStrings.cardEditRequired);
       return;
     }
-    if (plaintext.length > 200 || ciphertext.length > 500) {
-      setState(() => _error = AppStrings.cardEditTooLong);
+    if (plaintext.length > kPlaintextMaxLength || ciphertext.length > kCiphertextMaxLength) {
+      setState(
+        () => _error = AppStrings.cardEditTooLong(kPlaintextMaxLength, kCiphertextMaxLength),
+      );
       return;
     }
     Navigator.of(context).pop(
@@ -1260,7 +1263,7 @@ class _CardEditDialogState extends State<_CardEditDialog> {
             TextField(
               key: const ValueKey<String>('card_edit_plaintext'),
               controller: _plaintext,
-              maxLength: 200,
+              maxLength: kPlaintextMaxLength,
               minLines: 1,
               maxLines: 3,
               decoration: const InputDecoration(labelText: AppStrings.cardEditPlaintextLabel),
@@ -1268,7 +1271,7 @@ class _CardEditDialogState extends State<_CardEditDialog> {
             TextField(
               key: const ValueKey<String>('card_edit_ciphertext'),
               controller: _ciphertext,
-              maxLength: 500,
+              maxLength: kCiphertextMaxLength,
               minLines: 1,
               maxLines: 4,
               decoration: const InputDecoration(labelText: AppStrings.cardEditCiphertextLabel),

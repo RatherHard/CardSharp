@@ -46,20 +46,18 @@ abstract final class AppStrings {
   // ---------------------------------------------------------------- 侧栏
   static const String drawerGuestName = '请登录';
   static const String drawerSignOut = '退出登录';
+  static const String drawerTrash = '回收站';
 
   // ---------------------------------------------------------------- 书架
   static const String shelfMenuTooltip = '侧栏';
   static const String shelfCreateTooltip = '新建卡片集';
   static const String shelfEmptyTitle = '还没有卡片集';
   static const String shelfEmptySubtitle = '点右上角「+」新建一个';
-  static const String shelfNoMatchTitle = '没有找到匹配的卡片集';
-  static const String shelfNoMatchSubtitle = '换个关键词试试';
   static const String shelfLoadErrorTitle = '卡片集加载失败';
   static const String shelfCreateFailed = '新建卡片集失败，请重试';
   static const String shelfDeleteFailed = '删除卡片集失败，请重试';
 
   // ---------------------------------------------------------------- 卡片集
-  static const String createDeckTitle = '新建卡片集';
   static const String createDeckFieldLabel = '卡片集名称';
   static const String createDeckFieldHint = '例如：高等数学·极限';
   static const String deleteDeckTitle = '删除卡片集';
@@ -67,8 +65,8 @@ abstract final class AppStrings {
   /// 卡片数后缀，例如「12 张卡片」。
   static String deckCardCount(int count) => '$count 张卡片';
 
-  /// 删除确认文案。删除不可恢复，必须把后果写在文案里。
-  static String deleteDeckConfirm(String title) => '确定删除「$title」吗？删除后不可恢复。';
+  /// 删除确认文案。删除是「移入回收站」，必须把可恢复这条写清楚。
+  static String deleteDeckConfirm(String title) => '确定把「$title」移到回收站吗？之后可以在回收站里恢复。';
 
   // ---------------------------------------------------------------- 卡片集详情
   static const String deckDetailCardsTitle = '卡片列表';
@@ -81,7 +79,6 @@ abstract final class AppStrings {
 
   // ---------------------------------------------------------------- 卡片页（浏览模式）
   static const String cardImageEmpty = '还没有配图';
-  static const String cardImageEmptyHint = '接入后端后可上传和查看配图';
   static const String cardDefinitionLabel = '定义';
   static const String cardHintLabel = '提示';
   static const String cardExtraLabel = '备注';
@@ -93,8 +90,6 @@ abstract final class AppStrings {
   static const String cardRetry = '重试';
 
   /// 卡片页顶部星标：接后端后是「收藏/标记」，现在只做本地切换。
-  static const String cardFavoriteTooltip = '标记卡片';
-  static const String cardFavoriteHint = '标记功能接入后端后可用';
 
   /// Agent 区占位（AI 分析 / 解题），接后端后接 SSE 流式回答（docs/03 §7.5 InlineChatSection）。
   static const String cardAgentTitle = 'Agent 分析 / 解题';
@@ -104,8 +99,6 @@ abstract final class AppStrings {
   static const String cardInputHint = '选项 / 回答输入 / 提问';
 
   /// 卡片页底部「翻页」：翻到卡片集里的下一张。
-  static const String cardFlipLabel = '翻页';
-  static const String cardFlipLastHint = '已是最后一张';
 
   // ---------------------------------------------------------------- 复习（运行）
   static const String reviewTitle = '复习';
@@ -133,11 +126,6 @@ abstract final class AppStrings {
   static const String actionSave = '保存';
   static const String hintLongPressToEdit = '长按可修改';
 
-  static const String deckEditNameTitle = '修改卡片集名称';
-  static const String deckEditNameLabel = '名称';
-  static const String deckEditDescriptionTitle = '修改简介';
-  static const String deckEditDescriptionLabel = '简介';
-
   /// 简介为空时的占位提示：让用户知道这里可以长按添加。
   static const String deckAddDescriptionHint = '添加简介';
   static const String deckEditColorTitle = '修改封面颜色';
@@ -151,10 +139,14 @@ abstract final class AppStrings {
   static const String cardEditExtraLabel = '备注';
   static const String cardEditOrderLabel = '序号';
   static const String cardEditRequired = '明文和暗文都不能为空';
-  static const String cardEditTooLong = '明文不超过 200 字，暗文不超过 500 字';
+
+  /// 长度上限提示。上限只定义在 `cards/domain/card.dart`，由调用方传进来，
+  /// 避免文案里再写一份数字（`core` 不能反向依赖 `features`，见 docs/05 §1）。
+  static String cardEditTooLong(int plaintextMax, int ciphertextMax) =>
+      '明文不超过 $plaintextMax 字，暗文不超过 $ciphertextMax 字';
   static const String cardUpdateFailed = '保存失败，请重试';
   static const String cardDeleteTitle = '删除卡片';
-  static const String cardDeleteConfirmText = '删除后不可恢复，确定删除这张卡片吗？';
+  static const String cardDeleteConfirmText = '移到回收站？之后可以在回收站里恢复。';
   static const String cardDeleteFailed = '删除失败，请重试';
 
   static const String multiSelectEnter = '多选';
@@ -168,14 +160,67 @@ abstract final class AppStrings {
 
   static String multiSelectDeleteCount(int count) => '删除（$count）';
 
-  static String multiSelectDeleteConfirm(int count) => '确定删除选中的 $count 张卡片吗？删除后不可恢复。';
+  static String multiSelectDeleteConfirm(int count) => '确定把选中的 $count 张卡片移到回收站吗？之后可以恢复。';
+
+  // ---------------------------------------------------------------- 回收站
+  static const String trashTitle = '回收站';
+  static const String trashEmpty = '回收站是空的';
+  static const String trashEmptyHint = '删除卡片集或卡片后会出现在这里';
+  static const String trashLoadFailed = '回收站加载失败';
+  static const String trashSectionDecks = '卡片集';
+  static const String trashSectionCards = '卡片';
+  static const String trashRestore = '恢复';
+
+  /// 卡片来源标注，例如「来自「卡片集1」」。
+  static String trashCardSource(String deckTitle) => '来自「$deckTitle」';
+
+  /// 回收站按天分组的日期头：当年只写「10月1日」，跨年补年份。
+  static String trashDayHeader(DateTime day, DateTime now) =>
+      day.year == now.year ? '${day.month}月${day.day}日' : '${day.year}年${day.month}月${day.day}日';
+
+  static const String trashRestoreDeckTitle = '恢复卡片集';
+  static const String trashRestoreWholeDeck = '恢复整个卡片集';
+
+  /// 恢复整个卡片集前的确认；说明卡片会一起回来。
+  static String trashRestoreDeckConfirm(String title) => '把「$title」恢复到书架？跟着它一起删除的卡片也会一起恢复。';
+
+  static const String trashRestoreCardTitle = '恢复到哪里';
+  static const String trashRestoreToOriginal = '恢复到原卡片集';
+  static const String trashRestoreToNew = '新建卡片集恢复';
+  static const String trashRestoreNewTitleLabel = '新卡片集名称';
+
+  /// 原卡片集还在回收站时，单张恢复会把它一起恢复，需要提示。
+  static String trashRestoreCascadeHint(String deckTitle) => '原卡片集「$deckTitle」也会一起恢复';
+
+  /// 在回收站卡片详情里恢复单张时，「原卡片集」这一项的副作用说明。
+  static String trashRestoreWithDeckHint(String deckTitle) => '会把「$deckTitle」整个卡片集一起恢复';
+
+  static const String trashRestoreDone = '已恢复';
+  static const String trashRestoreFailed = '恢复失败，请重试';
+  static const String trashDeckEmpty = '这个卡片集没有可恢复的卡片';
+  static const String trashDeckNotFound = '回收站里没有这个卡片集';
+
+  // ---- 永久删除（回收站里的多选）--------------------------------------
+  static const String trashSelect = '选择';
+  static const String trashPurge = '永久删除';
+  static const String trashPurgeTitle = '永久删除';
+
+  /// 永久删除前的确认，必须把「无法恢复」说清楚。
+  static String trashPurgeConfirm(int count) => '删除后无法恢复，确定永久删除选中的 $count 项吗？';
+
+  static const String trashPurgeDone = '已永久删除';
+  static const String trashPurgeFailed = '永久删除失败，请重试';
 
   // ---------------------------------------------------------------- 导入
-  static const String shelfAddMenuTitle = '添加卡片集';
   static const String shelfAddMenuImport = '导入卡片集';
 
   /// 内置示例卡片集：应用自带一份 JSON，演示时不必先往手机里传文件。
   static const String shelfAddMenuImportSample = '导入示例卡片集';
+
+  /// 有多个示例时先选一个（`SampleDeck`）。
+  static const String shelfSamplePickerTitle = '选择示例卡片集';
+  static const String shelfSampleNaiwaHint = '8 张卡片，带角色配图';
+  static const String shelfSampleMiniWorldHint = '10 张卡片，带角色问句';
   static const String shelfAddMenuCreate = '新建卡片集';
   static const String importFailed = '导入失败，请检查文件';
   static const String importErrorInvalidJson = '文件不是有效的 JSON';
@@ -195,16 +240,17 @@ abstract final class AppStrings {
   static const String deckTitleRequired = '卡片集名称不能为空';
 
   // ---------------------------------------------------------------- 搜索
-  static const String searchModeDecks = '卡片集';
-  static const String searchModeAllCards = '全部卡片';
-
-  /// 搜索框提示文字跟着模式变。
-  static const String searchDecksHint = '搜索卡片集';
-  static const String searchAllCardsHint = '搜索全部卡片';
+  //
+  // 搜索是「全量搜索 + 按层级分档」：同级的先出、再出下级、最后出上级。
+  // 分档标题就是层级名，所以这里不再有「卡片集 / 全部卡片」模式文案。
+  static const String searchHint = '搜索卡片集和卡片';
+  static const String searchSectionDecks = '卡片集';
+  static const String searchSectionCards = '卡片';
+  static const String searchSectionParent = '上级';
   static const String searchEmptyTitle = '没有找到匹配的内容';
   static const String searchEmptySubtitle = '换个关键词试试';
   static const String searchMoreResults = '更多搜索结果';
-  static const String searchDeckSearchHint = '搜索本集卡片';
+  static const String searchDeckSearchHint = '搜索本集卡片和卡片集';
 
   /// 命中字段标注。
   static const String searchFieldPlaintext = '明文命中';
@@ -257,4 +303,7 @@ abstract final class AppStrings {
   /// - 导入该示例后，书架按这个标题给它配演示封面（见 `demo_deck_covers.dart`）；
   /// - 有单测 `sample_deck_test.dart` 守着这两处不许漂移。
   static const String sampleDeckTitle = '奶蛙家族图鉴';
+
+  /// 第二个内置示例（迷你世界角色）的标题，同样与 `assets/examples/mini-world-deck.json` 一致。
+  static const String sampleDeckMiniWorldTitle = '迷你世界角色图鉴';
 }

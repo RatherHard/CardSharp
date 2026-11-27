@@ -691,6 +691,15 @@ class $LocalCardsTable extends LocalCards with TableInfo<$LocalCardsTable, Local
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deletedWithDeckMeta = const VerificationMeta('deletedWithDeck');
+  @override
+  late final GeneratedColumn<String> deletedWithDeck = GeneratedColumn<String>(
+    'deleted_with_deck',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -701,6 +710,7 @@ class $LocalCardsTable extends LocalCards with TableInfo<$LocalCardsTable, Local
     createdAt,
     updatedAt,
     deletedAt,
+    deletedWithDeck,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -763,6 +773,12 @@ class $LocalCardsTable extends LocalCards with TableInfo<$LocalCardsTable, Local
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('deleted_with_deck')) {
+      context.handle(
+        _deletedWithDeckMeta,
+        deletedWithDeck.isAcceptableOrUnknown(data['deleted_with_deck']!, _deletedWithDeckMeta),
+      );
+    }
     return context;
   }
 
@@ -801,6 +817,10 @@ class $LocalCardsTable extends LocalCards with TableInfo<$LocalCardsTable, Local
         DriftSqlType.int,
         data['${effectivePrefix}deleted_at'],
       ),
+      deletedWithDeck: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}deleted_with_deck'],
+      ),
     );
   }
 
@@ -821,6 +841,13 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
   final int createdAt;
   final int updatedAt;
   final int? deletedAt;
+
+  /// 这张卡片是「跟着哪次删除卡片集一起进来的」：存卡片集 id。
+  ///
+  /// 为 null 表示用户单独删掉了这张卡片（回收站顶层按「卡片」列出、并标注来源）；
+  /// 非 null 表示它跟着那个卡片集进了回收站（只在回收站里的卡片集详情里出现）。
+  /// 两者分开，才能做到「恢复整个卡片集只带回它带走的卡片」。
+  final String? deletedWithDeck;
   const LocalCard({
     required this.id,
     required this.deckId,
@@ -830,6 +857,7 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    this.deletedWithDeck,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -844,6 +872,9 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<int>(deletedAt);
     }
+    if (!nullToAbsent || deletedWithDeck != null) {
+      map['deleted_with_deck'] = Variable<String>(deletedWithDeck);
+    }
     return map;
   }
 
@@ -857,6 +888,9 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent ? const Value.absent() : Value(deletedAt),
+      deletedWithDeck: deletedWithDeck == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedWithDeck),
     );
   }
 
@@ -871,6 +905,7 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       deletedAt: serializer.fromJson<int?>(json['deletedAt']),
+      deletedWithDeck: serializer.fromJson<String?>(json['deletedWithDeck']),
     );
   }
   @override
@@ -885,6 +920,7 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'deletedAt': serializer.toJson<int?>(deletedAt),
+      'deletedWithDeck': serializer.toJson<String?>(deletedWithDeck),
     };
   }
 
@@ -897,6 +933,7 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
     int? createdAt,
     int? updatedAt,
     Value<int?> deletedAt = const Value.absent(),
+    Value<String?> deletedWithDeck = const Value.absent(),
   }) => LocalCard(
     id: id ?? this.id,
     deckId: deckId ?? this.deckId,
@@ -906,6 +943,7 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    deletedWithDeck: deletedWithDeck.present ? deletedWithDeck.value : this.deletedWithDeck,
   );
   LocalCard copyWithCompanion(LocalCardsCompanion data) {
     return LocalCard(
@@ -917,6 +955,9 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      deletedWithDeck: data.deletedWithDeck.present
+          ? data.deletedWithDeck.value
+          : this.deletedWithDeck,
     );
   }
 
@@ -930,14 +971,24 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('deletedWithDeck: $deletedWithDeck')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, deckId, cardType, fields, sortOrder, createdAt, updatedAt, deletedAt);
+  int get hashCode => Object.hash(
+    id,
+    deckId,
+    cardType,
+    fields,
+    sortOrder,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    deletedWithDeck,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -949,7 +1000,8 @@ class LocalCard extends DataClass implements Insertable<LocalCard> {
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.deletedWithDeck == this.deletedWithDeck);
 }
 
 class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
@@ -961,6 +1013,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int?> deletedAt;
+  final Value<String?> deletedWithDeck;
   final Value<int> rowid;
   const LocalCardsCompanion({
     this.id = const Value.absent(),
@@ -971,6 +1024,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.deletedWithDeck = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalCardsCompanion.insert({
@@ -982,6 +1036,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
     required int createdAt,
     required int updatedAt,
     this.deletedAt = const Value.absent(),
+    this.deletedWithDeck = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        deckId = Value(deckId),
@@ -997,6 +1052,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? deletedAt,
+    Expression<String>? deletedWithDeck,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1008,6 +1064,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (deletedWithDeck != null) 'deleted_with_deck': deletedWithDeck,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1021,6 +1078,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int?>? deletedAt,
+    Value<String?>? deletedWithDeck,
     Value<int>? rowid,
   }) {
     return LocalCardsCompanion(
@@ -1032,6 +1090,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      deletedWithDeck: deletedWithDeck ?? this.deletedWithDeck,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1063,6 +1122,9 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<int>(deletedAt.value);
     }
+    if (deletedWithDeck.present) {
+      map['deleted_with_deck'] = Variable<String>(deletedWithDeck.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1080,6 +1142,7 @@ class LocalCardsCompanion extends UpdateCompanion<LocalCard> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('deletedWithDeck: $deletedWithDeck, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1369,6 +1432,7 @@ typedef $$LocalCardsTableCreateCompanionBuilder = LocalCardsCompanion Function({
   required int createdAt,
   required int updatedAt,
   Value<int?> deletedAt,
+  Value<String?> deletedWithDeck,
   Value<int> rowid,
 });
 typedef $$LocalCardsTableUpdateCompanionBuilder = LocalCardsCompanion Function({
@@ -1380,6 +1444,7 @@ typedef $$LocalCardsTableUpdateCompanionBuilder = LocalCardsCompanion Function({
   Value<int> createdAt,
   Value<int> updatedAt,
   Value<int?> deletedAt,
+  Value<String?> deletedWithDeck,
   Value<int> rowid,
 });
 
@@ -1414,6 +1479,11 @@ class $$LocalCardsTableFilterComposer extends Composer<_$AppDatabase, $LocalCard
 
   ColumnFilters<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deletedWithDeck => $composableBuilder(
+    column: $table.deletedWithDeck,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$LocalCardsTableOrderingComposer extends Composer<_$AppDatabase, $LocalCardsTable> {
@@ -1447,6 +1517,11 @@ class $$LocalCardsTableOrderingComposer extends Composer<_$AppDatabase, $LocalCa
 
   ColumnOrderings<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deletedWithDeck => $composableBuilder(
+    column: $table.deletedWithDeck,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalCardsTableAnnotationComposer extends Composer<_$AppDatabase, $LocalCardsTable> {
@@ -1480,6 +1555,9 @@ class $$LocalCardsTableAnnotationComposer extends Composer<_$AppDatabase, $Local
 
   GeneratedColumn<int> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deletedWithDeck =>
+      $composableBuilder(column: $table.deletedWithDeck, builder: (column) => column);
 }
 
 class $$LocalCardsTableTableManager
@@ -1516,6 +1594,7 @@ class $$LocalCardsTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> deletedAt = const Value.absent(),
+                Value<String?> deletedWithDeck = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalCardsCompanion(
                 id: id,
@@ -1526,6 +1605,7 @@ class $$LocalCardsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                deletedWithDeck: deletedWithDeck,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1538,6 +1618,7 @@ class $$LocalCardsTableTableManager
                 required int createdAt,
                 required int updatedAt,
                 Value<int?> deletedAt = const Value.absent(),
+                Value<String?> deletedWithDeck = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalCardsCompanion.insert(
                 id: id,
@@ -1548,6 +1629,7 @@ class $$LocalCardsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                deletedWithDeck: deletedWithDeck,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

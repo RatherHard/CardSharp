@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/repository_providers.dart';
+import '../../../core/state/data_revision.dart';
 import '../../../core/network/page.dart';
 import '../domain/card.dart';
+import '../../decks/application/decks_controller.dart';
 import '../domain/card_repository.dart';
 
 /// 某个卡片集下的卡片列表。参数为 deckId。
@@ -57,6 +59,10 @@ class CardActions {
   Future<void> delete(String deckId, String cardId) async {
     await _ref.read(cardRepositoryProvider).deleteCard(cardId);
     _ref.invalidate(cardsForDeckProvider(deckId));
+    // 书架与详情页头部的「N 张卡片」来自卡片集列表，删卡后要一起失效。
+    _ref.invalidate(decksControllerProvider);
+    // 回收站计数与列表是靠 dataRevisionProvider 感知变更的，删卡也要 bump。
+    _ref.read(dataRevisionProvider.notifier).bump();
   }
 
   /// 批量删除（多选模式）。空列表直接返回，不触发刷新。
@@ -66,5 +72,9 @@ class CardActions {
     }
     await _ref.read(cardRepositoryProvider).deleteCards(cardIds);
     _ref.invalidate(cardsForDeckProvider(deckId));
+    // 书架与详情页头部的「N 张卡片」来自卡片集列表，删卡后要一起失效。
+    _ref.invalidate(decksControllerProvider);
+    // 回收站计数与列表是靠 dataRevisionProvider 感知变更的，删卡也要 bump。
+    _ref.read(dataRevisionProvider.notifier).bump();
   }
 }

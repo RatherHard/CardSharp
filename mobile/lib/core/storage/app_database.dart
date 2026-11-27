@@ -40,6 +40,13 @@ class LocalCards extends Table {
   IntColumn get updatedAt => integer()();
   IntColumn get deletedAt => integer().nullable()();
 
+  /// 这张卡片是「跟着哪次删除卡片集一起进来的」：存卡片集 id。
+  ///
+  /// 为 null 表示用户单独删掉了这张卡片（回收站顶层按「卡片」列出、并标注来源）；
+  /// 非 null 表示它跟着那个卡片集进了回收站（只在回收站里的卡片集详情里出现）。
+  /// 两者分开，才能做到「恢复整个卡片集只带回它带走的卡片」。
+  TextColumn get deletedWithDeck => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
@@ -52,12 +59,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) async {
       await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      // v1 → v2：卡片增加「跟着哪个卡片集一起进回收站」的标记。
+      // 老库里的卡片都是 v1 之前就存在的，没有回收站历史，补空列即可。
+      if (from < 2) {
+        await m.addColumn(localCards, localCards.deletedWithDeck);
+      }
     },
   );
 }

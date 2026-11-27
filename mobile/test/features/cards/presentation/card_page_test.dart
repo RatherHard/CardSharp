@@ -1,4 +1,5 @@
 import 'package:cardsharp/core/di/repository_providers.dart';
+import 'package:cardsharp/core/l10n/app_strings.dart';
 import 'package:cardsharp/core/network/page.dart';
 import 'package:cardsharp/core/theme/app_theme.dart';
 import 'package:cardsharp/features/cards/data/fake_card_repository.dart';
@@ -111,6 +112,18 @@ void main() {
     expect(find.byKey(const ValueKey<String>('card_input_section')), findsNothing);
     expect(find.byKey(const ValueKey<String>('card_page_flip')), findsNothing);
     expect(find.byKey(const ValueKey<String>('card_favorite')), findsNothing);
+  });
+
+  testWidgets('答案就是名字本身时，不重复显示「定义」那一段', (WidgetTester tester) async {
+    // 迷你世界示例：问的是「谁」，答案只给名字（docs/04 §14.7）。
+    await _pumpCardPage(
+      tester,
+      cards: <Card>[_card(plaintext: '酋长', ciphertext: '酋长', extra: '原始人部落的首领')],
+    );
+
+    expect(find.text('酋长'), findsOneWidget);
+    expect(find.text(AppStrings.cardDefinitionLabel), findsNothing);
+    expect(find.byKey(const ValueKey<String>('card_detail_definition')), findsNothing);
   });
 
   testWidgets('没有提示与备注时不显示 Tips 区', (WidgetTester tester) async {

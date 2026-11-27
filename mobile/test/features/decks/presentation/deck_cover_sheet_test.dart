@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:cardsharp/core/di/repository_providers.dart';
 import 'package:cardsharp/core/di/service_providers.dart';
@@ -130,7 +130,7 @@ void main() {
     expect(service.pickCalls, <String>['1']);
   });
 
-  test('删除卡片集时清掉本机封面副本', () async {
+  test('删除卡片集进回收站时保留本机封面副本（恢复后封面还在）', () async {
     final _FakeDeckCoverService service = _FakeDeckCoverService();
     final ProviderContainer container = ProviderContainer.test(
       overrides: [
@@ -142,6 +142,7 @@ void main() {
     await container.read(decksControllerProvider.future);
     await container.read(decksControllerProvider.notifier).delete('1');
 
-    expect(service.removeCalls, <String>['1']);
+    // 删除 = 移入回收站，封面文件要跟着留着，否则恢复回来是一张白卡。
+    expect(service.removeCalls, isEmpty);
   });
 }

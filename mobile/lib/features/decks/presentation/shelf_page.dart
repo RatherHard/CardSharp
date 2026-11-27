@@ -7,9 +7,10 @@ import '../application/deck_list_state.dart';
 import '../domain/deck.dart';
 import '../domain/deck_import.dart';
 import '../domain/deck_repository.dart';
+import '../domain/sample_deck.dart';
 import '../../search/application/search_controller.dart';
-import '../../search/domain/search_hit.dart';
-import '../../search/domain/search_mode.dart';
+import '../../search/application/search_query.dart';
+import '../../search/domain/search_results.dart';
 import '../../search/presentation/search_results_view.dart';
 import 'widgets/deck_cover.dart';
 import '../../../core/di/service_providers.dart';
@@ -127,9 +128,48 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
   }
 
   /// 应用内置示例 → 解析 → 写入。与自选文件共用 `_applyImport`，避免两条导入路径分叉。
+  ///
+  /// 有多个内置示例时先让用户选一个（`SampleDeck`），再走同一条导入链路。
   Future<void> _importSampleDeck() async {
+    final SampleDeck? sample = await showModalBottomSheet<SampleDeck>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+              child: Text(
+                AppStrings.shelfSamplePickerTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              key: const ValueKey<String>('shelf_sample_naiwa'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text(AppStrings.sampleDeckTitle),
+              subtitle: const Text(AppStrings.shelfSampleNaiwaHint),
+              onTap: () => Navigator.of(context).pop(SampleDeck.naiwaFamily),
+            ),
+            ListTile(
+              key: const ValueKey<String>('shelf_sample_mini_world'),
+              leading: const Icon(Icons.extension_outlined),
+              title: const Text(AppStrings.sampleDeckMiniWorldTitle),
+              subtitle: const Text(AppStrings.shelfSampleMiniWorldHint),
+              onTap: () => Navigator.of(context).pop(SampleDeck.miniWorld),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (sample == null || !mounted) {
+      return;
+    }
     try {
-      final String text = await ref.read(bundledDeckLoaderProvider).loadExampleDeckJson();
+      final String text = await ref.read(bundledDeckLoaderProvider).loadSampleDeck(sample);
       if (!mounted) {
         return;
       }
@@ -218,9 +258,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
       children: <Widget>[
         _ShelfTopBar(
           searchController: _searchController,
-          mode: query.mode,
           hasKeyword: query.isActive,
-          onModeChanged: (SearchMode mode) => ref.read(searchQueryProvider.notifier).setMode(mode),
           onOpenDrawer: widget.onOpenDrawer ?? () => Scaffold.of(context).openDrawer(),
           onKeywordChanged: (String value) =>
               ref.read(searchQueryProvider.notifier).setKeyword(value),
@@ -232,7 +270,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
         ),
         Expanded(
           child: query.isActive
-              ? _buildSearchBody(context, query)
+              ? _buildSearchBody(context)
               : NotificationListener<ScrollNotification>(
                   onNotification: (ScrollNotification notification) {
                     if (notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
@@ -256,38 +294,21 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
     );
   }
 
-  /// 搜索态：按模式渲染两种结果列表。
-  Widget _buildSearchBody(BuildContext context, SearchQuery query) {
-    switch (query.mode) {
-      case SearchMode.decks:
-        return ref
-            .watch(deckSearchResultProvider)
-            .when(
-              data: (SearchOutcome<DeckSearchHit> outcome) => DeckSearchResultList(
-                outcome: outcome,
-                onOpenDeck: (String deckId) => context.push('/deck/$deckId'),
-                onShowMore: () => ref.read(searchQueryProvider.notifier).showMore(),
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => const Center(child: Text(AppStrings.deckDetailLoadFailed)),
-            );
-      case SearchMode.allCards:
-        return ref
-            .watch(allCardsSearchResultProvider)
-            .when(
-              data: (SearchOutcome<CardSearchHit> outcome) => CardSearchResultList(
-                outcome: outcome,
-                onOpenCard: (String deckId, String cardId) =>
-                    context.push('/deck/$deckId/card/$cardId'),
-                onShowMore: () => ref.read(searchQueryProvider.notifier).showMore(),
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => const Center(child: Text(AppStrings.deckDetailLoadFailed)),
-            );
-      case SearchMode.deckCards:
-        // 书架页不提供「本集」模式；若状态残留则退回卡片集搜索。
-        return const SearchEmptyState();
-    }
+  /// 搜索态：一次全量搜索，结果按层级分档（同级卡片集在上、下级卡片在下）。
+  Widget _buildSearchBody(BuildContext context) {
+    return ref
+        .watch(shelfSearchResultsProvider)
+        .when(
+          data: (ShelfSearchResults results) => ShelfSearchResultView(
+            results: results,
+            onOpenDeck: (String deckId) => context.push('/deck/$deckId'),
+            onOpenCard: (String deckId, String cardId) =>
+                context.push('/deck/$deckId/card/$cardId'),
+            onShowMore: () => ref.read(searchQueryProvider.notifier).showMore(),
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) => const Center(child: Text(AppStrings.deckDetailLoadFailed)),
+        );
   }
 
   Widget _buildGrid(BuildContext context, DeckListState state) {
@@ -342,9 +363,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
 class _ShelfTopBar extends StatelessWidget {
   const _ShelfTopBar({
     required this.searchController,
-    required this.mode,
     required this.hasKeyword,
-    required this.onModeChanged,
     required this.onOpenDrawer,
     required this.onKeywordChanged,
     required this.onClearKeyword,
@@ -352,9 +371,7 @@ class _ShelfTopBar extends StatelessWidget {
   });
 
   final TextEditingController searchController;
-  final SearchMode mode;
   final bool hasKeyword;
-  final ValueChanged<SearchMode> onModeChanged;
   final VoidCallback onOpenDrawer;
   final ValueChanged<String> onKeywordChanged;
   final VoidCallback onClearKeyword;
@@ -373,8 +390,8 @@ class _ShelfTopBar extends StatelessWidget {
             onPressed: onOpenDrawer,
             icon: const Icon(Icons.menu),
           ),
-          // 搜索框整体是一个圆角容器：放大镜 → 模式下拉 → 输入区。
-          // 模式放在框内左侧，符合「放大镜右边」的要求。
+          // 搜索框整体是一个圆角容器：放大镜 → 输入区。
+          // 搜索是一次全量搜索、按层级分档展示，所以没有模式下拉。
           Expanded(
             child: Container(
               height: 48,
@@ -387,81 +404,17 @@ class _ShelfTopBar extends StatelessWidget {
                   const SizedBox(width: 12),
                   Icon(Icons.search, size: 20, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 6),
-                  // 用 MenuAnchor + MenuItemButton 而不是 PopupMenuButton：
-                  // 前者保留标准定位/点外关闭/无障碍，同时允许给每一项设置圆角高亮。
-                  MenuAnchor(
-                    style: MenuStyle(
-                      backgroundColor: WidgetStatePropertyAll<Color>(
-                        theme.colorScheme.surfaceContainerHigh,
-                      ),
-                      shape: WidgetStatePropertyAll<OutlinedBorder>(
-                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      padding: const WidgetStatePropertyAll<EdgeInsets>(
-                        EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                      ),
-                    ),
-                    menuChildren: <Widget>[
-                      _modeItem(
-                        context,
-                        mode: SearchMode.decks,
-                        label: AppStrings.searchModeDecks,
-                        current: mode,
-                        onSelected: onModeChanged,
-                      ),
-                      _modeItem(
-                        context,
-                        mode: SearchMode.allCards,
-                        label: AppStrings.searchModeAllCards,
-                        current: mode,
-                        onSelected: onModeChanged,
-                      ),
-                    ],
-                    builder: (BuildContext context, MenuController controller, Widget? _) {
-                      return InkWell(
-                        key: const ValueKey<String>('shelf_search_mode'),
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => controller.isOpen ? controller.close() : controller.open(),
-                        child: Container(
-                          // 与搜索框同高（外框 48，这里留 4 上下边距 → 40），
-                          // 太小的胶囊夹在 48 高的框里会显得别扭。
-                          height: 40,
-                          padding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Text(
-                                mode == SearchMode.decks
-                                    ? AppStrings.searchModeDecks
-                                    : AppStrings.searchModeAllCards,
-                                style: theme.textTheme.labelLarge,
-                              ),
-                              const Icon(Icons.arrow_drop_down, size: 20),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 4),
                   Expanded(
                     child: TextField(
                       key: const ValueKey<String>('shelf_search_field'),
                       controller: searchController,
                       onChanged: onKeywordChanged,
                       textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        // 提示文字跟着模式变，避免切到「全部卡片」还提示搜索卡片集。
-                        hintText: mode == SearchMode.decks
-                            ? AppStrings.searchDecksHint
-                            : AppStrings.searchAllCardsHint,
+                      decoration: const InputDecoration(
+                        hintText: AppStrings.searchHint,
                         isDense: true,
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -485,32 +438,6 @@ class _ShelfTopBar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  /// 下拉里的一个模式项：圆角高亮块，选中项带淡色底。
-  Widget _modeItem(
-    BuildContext context, {
-    required SearchMode mode,
-    required String label,
-    required SearchMode current,
-    required ValueChanged<SearchMode> onSelected,
-  }) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final bool selected = mode == current;
-    return MenuItemButton(
-      key: ValueKey<String>('shelf_search_mode_${mode.name}'),
-      style: ButtonStyle(
-        shape: WidgetStatePropertyAll<OutlinedBorder>(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        backgroundColor: WidgetStatePropertyAll<Color?>(
-          selected ? scheme.primary.withValues(alpha: 0.12) : null,
-        ),
-        minimumSize: const WidgetStatePropertyAll<Size>(Size(120, 44)),
-      ),
-      onPressed: () => onSelected(mode),
-      child: Text(label),
     );
   }
 }

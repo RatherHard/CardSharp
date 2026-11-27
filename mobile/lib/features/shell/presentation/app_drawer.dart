@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/auth_state.dart';
+import '../../trash/application/trash_providers.dart';
 import '../../../core/l10n/app_strings.dart';
 
 /// 侧栏：头像 + 用户名 + 设置 + 退出登录。
@@ -74,6 +75,21 @@ class AppDrawer extends ConsumerWidget {
                   ),
                   SizedBox(height: narrow ? 14 : 18),
                   _DrawerItem(
+                    itemKey: const ValueKey<String>('drawer_trash_button'),
+                    icon: Icons.delete_outline,
+                    label: AppStrings.drawerTrash,
+                    // 角标只显示数量，读不到时不显示（不打扰）。
+                    badgeCount: ref.watch(trashCountProvider).value ?? 0,
+                    style: itemStyle,
+                    iconSize: narrow ? 20 : 24,
+                    gap: narrow ? 8 : 10,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/trash');
+                    },
+                  ),
+                  SizedBox(height: narrow ? 4 : 6),
+                  _DrawerItem(
                     itemKey: const ValueKey<String>('drawer_settings_button'),
                     icon: Icons.settings_outlined,
                     label: AppStrings.settings,
@@ -118,6 +134,7 @@ class _DrawerItem extends StatelessWidget {
     required this.iconSize,
     required this.gap,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final Key itemKey;
@@ -128,8 +145,12 @@ class _DrawerItem extends StatelessWidget {
   final double gap;
   final VoidCallback onTap;
 
+  /// 大于 0 时在标签右侧显示数量角标（回收站里有几项）。
+  final int badgeCount;
+
   @override
   Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return InkWell(
       key: itemKey,
       onTap: onTap,
@@ -141,7 +162,29 @@ class _DrawerItem extends StatelessWidget {
             Icon(icon, size: iconSize),
             SizedBox(width: gap),
             Expanded(
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+              child: Row(
+                children: <Widget>[
+                  Flexible(
+                    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+                  ),
+                  if (badgeCount > 0) ...<Widget>[
+                    const SizedBox(width: 6),
+                    Container(
+                      key: const ValueKey<String>('drawer_trash_badge'),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$badgeCount',
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(color: scheme.onPrimary),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),

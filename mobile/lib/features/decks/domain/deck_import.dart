@@ -63,9 +63,8 @@ class DeckImport {
 /// MVP 唯一的卡片类型（`docs/03` §4.2：`card_type` 固定 `memory`）。
 const String kMemoryCardType = 'memory';
 
-/// 明文/暗文长度上限，来自 `docs/03` §4.4。
-const int kPlaintextMaxLength = 200;
-const int kCiphertextMaxLength = 500;
+/// 明文/暗文长度上限见 `cards/domain/card.dart` 的 `kPlaintextMaxLength` /
+/// `kCiphertextMaxLength`（导入、编辑校验、文案共用一处定义）。
 
 /// 解析导入文件。
 ///

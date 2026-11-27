@@ -5,7 +5,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../shared/card_widgets/card_detail_body.dart';
 import '../application/card_providers.dart';
 import '../domain/card.dart';
-import 'widgets/demo_card_images.dart';
+import '../../../shared/card_widgets/demo_card_images.dart';
 
 /// 卡片页（直接点卡片进来）：大图 → 名字 → 「定义」+ 暗文 → Tips（默认折叠）。
 ///
@@ -72,16 +72,19 @@ class _CardBrowseView extends StatelessWidget {
           style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
-        Text(
-          AppStrings.cardDefinitionLabel,
-          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          fields.ciphertext,
-          key: const ValueKey<String>('card_detail_definition'),
-          style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
-        ),
+        // 有些卡片（如迷你世界示例）答案就是名字本身，这时不再重复画一遍「定义」。
+        if (fields.ciphertext.trim() != fields.plaintext.trim()) ...<Widget>[
+          Text(
+            AppStrings.cardDefinitionLabel,
+            style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            fields.ciphertext,
+            key: const ValueKey<String>('card_detail_definition'),
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+          ),
+        ],
         if ((fields.hint != null && fields.hint!.isNotEmpty) ||
             (fields.extra != null && fields.extra!.isNotEmpty)) ...<Widget>[
           const SizedBox(height: 20),

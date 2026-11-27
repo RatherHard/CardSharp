@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart' hide Card;
 
 import '../../core/l10n/app_strings.dart';
 import '../../features/cards/domain/card.dart';
-import '../../features/cards/presentation/widgets/demo_card_images.dart';
+import 'demo_card_images.dart';
 
 // 卡片内容的可复用展示块，给「卡片页」和「复习页翻转出的卡片正文」共用。
 // 放在 shared/ 是因为它被两个 feature 的 presentation 同时使用，
@@ -294,14 +294,17 @@ class CardDetailBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             CardImageBox(cardName: fields.plaintext, width: 96, height: 96),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                fields.ciphertext,
-                key: const ValueKey<String>('card_detail_definition'),
-                style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+            // 答案就是名字本身时（迷你世界示例），右侧不再重复一遍同样的文字。
+            if (fields.ciphertext.trim() != fields.plaintext.trim()) ...<Widget>[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  fields.ciphertext,
+                  key: const ValueKey<String>('card_detail_definition'),
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+                ),
               ),
-            ),
+            ],
           ],
         ),
         if ((fields.hint != null && fields.hint!.isNotEmpty) ||

@@ -7,6 +7,7 @@ import 'package:cardsharp/features/decks/domain/import_file_picker.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck.dart';
 import 'package:cardsharp/features/decks/domain/deck_repository.dart';
+import 'package:cardsharp/features/decks/domain/trashed_deck.dart';
 import 'package:cardsharp/features/decks/presentation/shelf_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,7 +66,7 @@ void main() {
     expect((delegate as SliverGridDelegateWithFixedCrossAxisCount).crossAxisCount, 3);
   });
 
-  testWidgets('卡片集模式：输入名称后进入搜索结果，命中项可点击', (WidgetTester tester) async {
+  testWidgets('一次搜索：卡片集（同级）在上、卡片（下级）在下', (WidgetTester tester) async {
     await _pumpShelf(tester);
 
     await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), '卡片集3');
@@ -73,9 +74,18 @@ void main() {
 
     expect(find.byKey(const ValueKey<String>('search_deck_3')), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('search_deck_1')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('search_section_decks')), findsOneWidget);
+    // 这一集没有卡片命中，所以「卡片」那一段不出现。
+    expect(find.byKey(const ValueKey<String>('search_section_cards')), findsNothing);
   });
 
-  testWidgets('卡片集模式：无匹配时显示搜索空态', (WidgetTester tester) async {
+  testWidgets('没有搜索模式切换：搜索框旁只有输入区', (WidgetTester tester) async {
+    await _pumpShelf(tester);
+
+    expect(find.byKey(const ValueKey<String>('shelf_search_mode')), findsNothing);
+  });
+
+  testWidgets('无匹配时显示搜索空态', (WidgetTester tester) async {
     await _pumpShelf(tester);
 
     await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), '不存在的关键词');
@@ -96,7 +106,7 @@ void main() {
     expect(find.byKey(const ValueKey<String>('search_empty_state')), findsNothing);
   });
 
-  testWidgets('切换到「全部卡片」后能搜到卡片内容', (WidgetTester tester) async {
+  testWidgets('搜卡片内容：卡片集一段为空、卡片一段有结果', (WidgetTester tester) async {
     await _pumpShelf(
       tester,
       seedCards: <String, List<Card>>{
@@ -110,14 +120,11 @@ void main() {
       },
     );
 
-    await tester.tap(find.byKey(const ValueKey<String>('shelf_search_mode')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('全部卡片').last);
-    await tester.pumpAndSettle();
-
     await tester.enterText(find.byKey(const ValueKey<String>('shelf_search_field')), 'ATP');
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey<String>('search_section_decks')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('search_section_cards')), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('search_card_c1')), findsOneWidget);
     expect(find.text('暗文命中'), findsOneWidget);
   });
@@ -243,6 +250,15 @@ class _BrokenRepository implements DeckRepository {
 
   @override
   Future<void> deleteDeck(String id) async => throw StateError('boom');
+
+  @override
+  Future<List<TrashedDeck>> fetchTrashedDecks() async => throw StateError('boom');
+
+  @override
+  Future<void> restoreDeck(String id) async => throw StateError('boom');
+
+  @override
+  Future<void> purgeDeck(String id) async => throw StateError('boom');
 }
 
 /// 固定返回一段 JSON 文本，用来替代系统文件选择器。

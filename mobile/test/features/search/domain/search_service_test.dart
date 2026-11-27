@@ -1,5 +1,6 @@
-import 'package:cardsharp/features/search/domain/search_hit.dart';
+﻿import 'package:cardsharp/features/search/domain/search_hit.dart';
 import 'package:cardsharp/features/search/domain/search_service.dart';
+import 'package:cardsharp/features/search/domain/search_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DeckSource _deck({

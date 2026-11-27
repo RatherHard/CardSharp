@@ -7,6 +7,7 @@ import 'package:cardsharp/features/cards/domain/card.dart';
 import 'package:cardsharp/core/di/service_providers.dart';
 import 'package:cardsharp/features/decks/data/asset_bundled_deck_loader.dart';
 import 'package:cardsharp/features/decks/domain/bundled_deck_loader.dart';
+import 'package:cardsharp/features/decks/domain/sample_deck.dart';
 import 'package:cardsharp/features/decks/data/fake_deck_repository.dart';
 import 'package:cardsharp/features/decks/domain/deck_import.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +28,7 @@ class _InMemoryBundledLoader implements BundledDeckLoader {
   final String json;
 
   @override
-  Future<String> loadExampleDeckJson() async => json;
+  Future<String> loadSampleDeck(SampleDeck sample) async => json;
 }
 
 /// 内置示例卡片集：资源存在、能被解析、能从菜单一键导入并显示卡片。
@@ -35,7 +36,7 @@ class _InMemoryBundledLoader implements BundledDeckLoader {
 /// 这条测试挡的是「演示时点了导入示例却没反应」——数据缺失或格式不符都会在这里失败。
 void main() {
   test('内置示例资源存在且能被解析成卡片集', () async {
-    final String text = await const AssetBundledDeckLoader().loadExampleDeckJson();
+    final String text = await const AssetBundledDeckLoader().loadSampleDeck(SampleDeck.naiwaFamily);
     final DeckImport data = parseDeckImport(text);
 
     expect(data.title, isNotEmpty);
@@ -58,7 +59,7 @@ void main() {
     // 真实文件 IO 必须在 runAsync 里跑：testWidgets 默认是假时钟，
     // 直接 await rootBundle 会永远不返回。
     final String? sampleJson = await tester.runAsync(
-      () => const AssetBundledDeckLoader().loadExampleDeckJson(),
+      () => const AssetBundledDeckLoader().loadSampleDeck(SampleDeck.naiwaFamily),
     );
     expect(sampleJson, isNotNull);
     final DeckImport expected = parseDeckImport(sampleJson!);
@@ -91,6 +92,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey<String>('shelf_create_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey<String>('shelf_menu_import_sample')));
+    await tester.pumpAndSettle();
+    // 两个示例先选一个：点奶蛙家族。
+    await tester.tap(find.byKey(const ValueKey<String>('shelf_sample_naiwa')));
     await tester.pumpAndSettle();
 
     expect(find.text(expected.title), findsOneWidget);

@@ -1,6 +1,7 @@
 import '../../../core/network/page.dart';
 import '../domain/deck.dart';
 import '../domain/deck_repository.dart';
+import '../domain/trashed_deck.dart';
 
 /// 本期种子数据：6 个空卡片集。
 ///
@@ -26,11 +27,31 @@ class FakeDeckRepository implements DeckRepository {
   final List<Deck> _decks;
   int _nextId;
 
+  /// 回收站：卡片集 id → (卡片集, 删除前在原列表里的位置, 删除时间)。
+  ///
+  /// 位置记下来是为了「恢复回原位」；真实实现靠 `created_at` 排序，
+  /// 假实现没有创建时间字段，只能记住下标。
+  final Map<String, ({Deck deck, int index, DateTime deletedAt})> _trashed =
+      <String, ({Deck deck, int index, DateTime deletedAt})>{};
+
   /// 统计卡片数的回调，仅假实现使用：真实数量应由后端 `stats` 提供。
   ///
   /// 由组合根注入（`main.dart` 里传 `FakeCardRepository.countFor`），
   /// 这样假卡片集仓储不需要跨 feature 直接读卡片数据。
-  final int Function(String deckId)? cardCounter;
+  int Function(String deckId)? cardCounter;
+
+  /// 删除卡片集时的联动回调（测试里接 `FakeCardRepository.trashDeckCards`，
+  /// 让卡片的批次标记跟上，和 Local 实现语义一致）。
+  ///
+  /// 用可变字段而不是构造参数：调用点大多是 `FakeDeckRepository(seed)` 的位置参数写法，
+  /// 加命名参数会逼着所有老测试改签名。
+  void Function(String deckId)? onDeleted;
+
+  /// 恢复卡片集时的联动回调（接 `FakeCardRepository.restoreDeckCards`）。
+  void Function(String deckId)? onRestored;
+
+  /// 永久删除卡片集时的联动回调（接 `FakeCardRepository.purgeDeckCards`）。
+  void Function(String deckId)? onPurged;
 
   @override
   Future<PagedResult<Deck>> fetchDecks({String? cursor, int limit = 20}) async {
@@ -95,7 +116,38 @@ class FakeDeckRepository implements DeckRepository {
     if (index < 0) {
       throw const DeckException(DeckFailure.notFound);
     }
-    _decks.removeAt(index);
+    final Deck deck = _decks.removeAt(index);
+    _trashed[id] = (deck: deck, index: index, deletedAt: DateTime.now());
+    onDeleted?.call(id);
+  }
+
+  @override
+  Future<List<TrashedDeck>> fetchTrashedDecks() async {
+    final List<TrashedDeck> result = <TrashedDeck>[
+      for (final ({Deck deck, int index, DateTime deletedAt}) entry in _trashed.values)
+        TrashedDeck(deck: entry.deck, deletedAt: entry.deletedAt),
+    ]..sort((TrashedDeck a, TrashedDeck b) => b.deletedAt.compareTo(a.deletedAt));
+    return List<TrashedDeck>.unmodifiable(result);
+  }
+
+  @override
+  Future<void> restoreDeck(String id) async {
+    final ({Deck deck, int index, DateTime deletedAt})? entry = _trashed.remove(id);
+    if (entry == null) {
+      throw const DeckException(DeckFailure.notFound);
+    }
+    final int at = entry.index.clamp(0, _decks.length);
+    _decks.insert(at, entry.deck);
+    onRestored?.call(id);
+  }
+
+  @override
+  Future<void> purgeDeck(String id) async {
+    // 不在回收站里（或已恢复、已抹掉）就当作无事发生，保持幂等。
+    if (_trashed.remove(id) == null) {
+      return;
+    }
+    onPurged?.call(id);
   }
 
   /// 取现有数字 id 的最大值 + 1。

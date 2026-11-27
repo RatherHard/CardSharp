@@ -3,6 +3,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'card.freezed.dart';
 part 'card.g.dart';
 
+/// 卡片内容长度上限，来自 `docs/03` §4.4：明文 ≤ 200 字、暗文 ≤ 500 字。
+///
+/// 导入解析、编辑弹窗的校验与长度提示文案都引用这两个常量，避免多处各写一遍。
+const int kPlaintextMaxLength = 200;
+const int kCiphertextMaxLength = 500;
+
 /// 卡片配图。
 ///
 /// `key` 是对象存储的 key（不是完整 URL），尺寸与 alt 由后端在生成时写入。

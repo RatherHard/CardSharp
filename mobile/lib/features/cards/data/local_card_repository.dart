@@ -6,6 +6,7 @@ import '../../../core/network/page.dart';
 import '../../../core/storage/app_database.dart';
 import '../domain/card.dart';
 import '../domain/card_repository.dart';
+import '../domain/trashed_card.dart';
 
 /// 基于 Drift 的卡片仓储。
 ///
@@ -64,11 +65,17 @@ class LocalCardRepository implements CardRepository {
 
   @override
   Future<void> deleteCard(String id) async {
+    final int now = DateTime.now().millisecondsSinceEpoch;
     final int changed =
         await (_db.update(
           _db.localCards,
         )..where((LocalCards t) => t.id.equals(id) & t.deletedAt.isNull())).write(
-          LocalCardsCompanion(deletedAt: Value<int>(DateTime.now().millisecondsSinceEpoch)),
+          LocalCardsCompanion(
+            deletedAt: Value<int>(now),
+            // 单独删除：不归任何卡片集批次，于是会出现在回收站顶层并标注来源。
+            deletedWithDeck: const Value<String?>(null),
+            updatedAt: Value<int>(now),
+          ),
         );
     if (changed == 0) {
       throw const CardException(CardFailure.cardNotFound);
@@ -81,9 +88,92 @@ class LocalCardRepository implements CardRepository {
       return;
     }
     final int now = DateTime.now().millisecondsSinceEpoch;
-    await (_db.update(_db.localCards)..where((LocalCards t) => t.id.isIn(ids))).write(
-      LocalCardsCompanion(deletedAt: Value<int>(now), updatedAt: Value<int>(now)),
+    await (_db.update(
+      _db.localCards,
+    )..where((LocalCards t) => t.id.isIn(ids) & t.deletedAt.isNull())).write(
+      LocalCardsCompanion(
+        deletedAt: Value<int>(now),
+        deletedWithDeck: const Value<String?>(null),
+        updatedAt: Value<int>(now),
+      ),
     );
+  }
+
+  @override
+  Future<List<TrashedCard>> fetchStandaloneTrashedCards() async {
+    final List<LocalCard> rows =
+        await (_db.select(_db.localCards)
+              ..where((LocalCards t) => t.deletedAt.isNotNull() & t.deletedWithDeck.isNull())
+              ..orderBy(<OrderingTerm Function(LocalCards)>[
+                (LocalCards t) => OrderingTerm.desc(t.deletedAt),
+              ]))
+            .get();
+    if (rows.isEmpty) {
+      return const <TrashedCard>[];
+    }
+
+    final Set<String> deckIds = <String>{for (final LocalCard row in rows) row.deckId};
+    final List<LocalDeck> decks = await (_db.select(
+      _db.localDecks,
+    )..where((LocalDecks t) => t.id.isIn(deckIds))).get();
+    final Map<String, String> deckTitles = <String, String>{
+      for (final LocalDeck deck in decks) deck.id: deck.title,
+    };
+
+    return List<TrashedCard>.unmodifiable(<TrashedCard>[
+      for (final LocalCard row in rows)
+        TrashedCard(
+          card: _toCard(row),
+          deletedAt: DateTime.fromMillisecondsSinceEpoch(row.deletedAt!),
+          sourceDeckTitle: deckTitles[row.deckId] ?? '',
+        ),
+    ]);
+  }
+
+  @override
+  Future<List<Card>> fetchTrashedCardsOfDeck(String deckId) async {
+    final List<LocalCard> rows =
+        await (_db.select(_db.localCards)
+              ..where((LocalCards t) => t.deletedWithDeck.equals(deckId))
+              ..orderBy(<OrderingTerm Function(LocalCards)>[
+                (LocalCards t) => OrderingTerm.asc(t.sortOrder),
+                (LocalCards t) => OrderingTerm.asc(t.createdAt),
+              ]))
+            .get();
+    return List<Card>.unmodifiable(<Card>[for (final LocalCard row in rows) _toCard(row)]);
+  }
+
+  @override
+  Future<void> restoreCard(String cardId, {required String targetDeckId}) async {
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final int changed =
+        await (_db.update(
+          _db.localCards,
+        )..where((LocalCards t) => t.id.equals(cardId) & t.deletedAt.isNotNull())).write(
+          LocalCardsCompanion(
+            deckId: Value<String>(targetDeckId),
+            deletedAt: const Value<int?>(null),
+            deletedWithDeck: const Value<String?>(null),
+            updatedAt: Value<int>(now),
+          ),
+        );
+    if (changed == 0) {
+      throw const CardException(CardFailure.cardNotFound);
+    }
+  }
+
+  @override
+  Future<void> purgeCards(Iterable<String> cardIds) async {
+    final List<String> ids = cardIds.toList();
+    if (ids.isEmpty) {
+      return;
+    }
+    // 只删「单独删进回收站」的卡片：跟着卡片集一起删的走卡片集那条路，
+    // 正常卡片（deletedAt 为空）一律不碰。
+    await (_db.delete(_db.localCards)..where(
+          (LocalCards t) => t.id.isIn(ids) & t.deletedAt.isNotNull() & t.deletedWithDeck.isNull(),
+        ))
+        .go();
   }
 
   @override

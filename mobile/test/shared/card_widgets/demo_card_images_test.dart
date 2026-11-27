@@ -1,16 +1,31 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cardsharp/features/cards/presentation/widgets/demo_card_images.dart';
+import 'package:cardsharp/shared/card_widgets/demo_card_images.dart';
 
 // 演示配图表是「本地资源 → 卡片名」的唯一映射，接后端后整表删除。
 // 这里守住它自身的一致性和命名，防止改名/漏配导致图片静默消失。
 
 void main() {
-  test('演示配图表覆盖示例卡片集的 8 个角色', () {
-    expect(kDemoCardImages.length, 8);
+  test('演示配图表覆盖两个示例卡片集的 18 个角色', () {
+    expect(kDemoCardImages.length, 18);
     expect(
       kDemoCardImages.keys,
       containsAll(<String>['奶蛙', '奶蛋', '小奶蛙', '奶鼠', '奶鸡', '奶屎', '豆奶', '奶茶']),
+    );
+    expect(
+      kDemoCardImages.keys,
+      containsAll(<String>[
+        '酋长',
+        '卡卡',
+        '妮妮',
+        '酋长夫人',
+        '熊孩子',
+        '特工罗拉',
+        '小淘气辛迪',
+        '汤姆队长',
+        '助教彼得',
+        '史提芬教授',
+      ]),
     );
   });
 

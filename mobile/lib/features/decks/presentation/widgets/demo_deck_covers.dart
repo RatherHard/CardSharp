@@ -8,10 +8,12 @@ import '../../../../core/l10n/app_strings.dart';
 /// * 等后端提供封面图（URL 或对象存储 key）时，`Deck` 加正式字段、这里整份删掉即可。
 ///
 /// 键是卡片集标题（内置示例的标题固定，常量收口在
-/// [AppStrings.sampleDeckTitle]，与 `assets/examples/deck-sample.json` 由单测对齐），
+/// [AppStrings.sampleDeckTitle] / [AppStrings.sampleDeckMiniWorldTitle]，
+/// 分别与 `assets/examples/deck-sample.json`、`mini-world-deck.json` 由单测对齐），
 /// 值是打包在 assets 里的图片路径。用户自己导入的其它卡片集仍显示白色卡堆。
 const Map<String, String> kDemoDeckCoverAssets = <String, String>{
   AppStrings.sampleDeckTitle: 'assets/examples/naiwa-cover.png',
+  AppStrings.sampleDeckMiniWorldTitle: 'assets/examples/mini-world-cover.png',
 };
 
 /// 取某个卡片集的演示封面；没有配图时返回 null（调用方回落到白色卡堆）。

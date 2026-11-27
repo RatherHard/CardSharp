@@ -1,11 +1,13 @@
 import 'search_hit.dart';
+import 'search_limits.dart';
+import 'search_source.dart';
 
 /// 本地搜索服务：**纯函数**，不依赖 Riverpod、不依赖 Flutter。
 ///
 /// 现在的数据都在内存里，所以直接遍历过滤；接后端后把内部实现换成调用
 /// `GET /search?q=&deck_id=`（`docs/03` §6），页面与状态层不用改。
 class SearchService {
-  const SearchService({this.hitLimit = 50, this.scanLimit = 500});
+  const SearchService({this.hitLimit = kSearchHitLimit, this.scanLimit = kSearchScanLimit});
 
   /// 单次返回的最大命中条数。对齐 `docs/03` 的「结果限 50 条」。
   final int hitLimit;
