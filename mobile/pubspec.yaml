@@ -35,10 +35,10 @@ environment:
 hooks:
   user_defines:
     sqlite3:
-      source: system
-      name:
-        windows: winsqlite3
-        default: sqlite3
+      # 用打包进 APK 的 sqlite3（由 sqlite3_flutter_libs 提供），**不用系统库**：
+      # Android 7+ 不再向应用暴露系统 libsqlite3.so，`source: system` 在真机上
+      # 会直接报 dlopen failed，表现为「卡片集加载失败」。
+      source: sqlite3
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
